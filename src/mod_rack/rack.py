@@ -475,7 +475,6 @@ class RoutingManager:
         """Розраховує пари (вихід, вхід) між двома слотами."""
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
-        print("MIDI!", inputs, outputs)
         # Визначаємо прапори об'єднання (join)
         join_midi_outputs = True  # src.join_midi_outputs
         join_midi_inputs = True  # dst.join_midi_inputs
@@ -549,7 +548,11 @@ class RoutingManager:
                     if dst.audio_inputs:
                         audio_pairs = cls.get_audio_connection_pairs(src, dst)
                         desired.update(audio_pairs)
-                        break  # Знайшли споживача, далі не йдемо
+                        # Зупиняємось тільки якщо dst може продовжити ланцюг
+                        # (має виходи або це кінцевий HW_OUT)
+                        if dst.audio_outputs or dst is output_slot:
+                            break
+                        # Інакше продовжуємо шукати — сигнал має пройти далі
 
             # --- Робота з MIDI ---
             if src.midi_outputs:
@@ -559,7 +562,9 @@ class RoutingManager:
                     if dst.midi_inputs:
                         midi_pairs = cls.get_midi_connection_pairs(src, dst)
                         desired.update(midi_pairs)
-                        break  # Знайшли споживача, далі не йдемо
+                        # Аналогічно для MIDI
+                        if dst.midi_outputs or dst is output_slot:
+                            break
 
         return desired
 
