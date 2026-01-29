@@ -20,6 +20,30 @@ if TYPE_CHECKING:
     from mod_rack.rack import Orchestrator, PluginSlot
 
 
+def _serialize_control(ctrl) -> dict:
+    """Serialize a ControlPort to dict for JSON."""
+    return {
+        "symbol": ctrl.symbol,
+        "name": ctrl.name,
+        "minimum": ctrl.minimum,
+        "maximum": ctrl.maximum,
+        "default": ctrl.default,
+        "scale_points": [{"value": sp.value, "label": sp.label} for sp in ctrl.scale_points],
+        "properties": ctrl.properties.name if ctrl.properties else "NONE",
+        "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label} if ctrl.units else None,
+        "range_steps": ctrl.range_steps,
+        "value": ctrl.value,
+    }
+
+
+def _serialize_slot(slot: "PluginSlot") -> dict:
+    """Serialize a PluginSlot with its controls to dict for JSON."""
+    return {
+        "label": slot.label,
+        "controls": [_serialize_control(ctrl) for ctrl in slot.plugin.controls.values()],
+    }
+
+
 class RackWSServer:
     """
     WebSocket server that exposes rack order to clients.
@@ -29,7 +53,7 @@ class RackWSServer:
             {"cmd": "get_order"}
 
         Server -> Client:
-            {"event": "order", "labels": ["plugin1", "plugin2", ...]}
+            {"event": "order", "slots": [{label, controls: [...]}]}
     """
 
     def __init__(self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000):
@@ -43,14 +67,14 @@ class RackWSServer:
         # Register for order changes
         orchestrator.on_rack_order_changed(self._on_order_changed)
 
-    def _get_order_labels(self) -> list[str]:
-        """Get current order as list of labels."""
-        return [slot.label for slot in self.orchestrator.slots]
+    def _get_order_data(self) -> list[dict]:
+        """Get current order as list of slot data with controls."""
+        return [_serialize_slot(slot) for slot in self.orchestrator.slots]
 
     def _on_order_changed(self, slots: list["PluginSlot"]) -> None:
         """Called when rack order changes - broadcast to all clients."""
-        labels = [slot.label for slot in slots]
-        message = json.dumps({"event": "order", "labels": labels})
+        slots_data = [_serialize_slot(slot) for slot in slots]
+        message = json.dumps({"event": "order", "slots": slots_data})
 
         if self._loop and self._clients:
             asyncio.run_coroutine_threadsafe(
@@ -78,8 +102,8 @@ class RackWSServer:
         print(f"[WS] Client connected: {websocket.remote_address}")
 
         # Send current order on connect
-        labels = self._get_order_labels()
-        await websocket.send(json.dumps({"event": "order", "labels": labels}))
+        slots_data = self._get_order_data()
+        await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
 
         try:
             async for raw in websocket:
@@ -88,8 +112,8 @@ class RackWSServer:
                     cmd = msg.get("cmd")
 
                     if cmd == "get_order":
-                        labels = self._get_order_labels()
-                        await websocket.send(json.dumps({"event": "order", "labels": labels}))
+                        slots_data = self._get_order_data()
+                        await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
                     else:
                         await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
 

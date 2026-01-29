@@ -4,15 +4,18 @@ MicroPython WebSocket client for RackService order monitoring.
 Usage:
     from rack_client import RackClient
 
-    def on_order(labels):
-        print("Order:", labels)
+    def on_order(slots):
+        for slot in slots:
+            print("Slot:", slot["label"])
+            for ctrl in slot["controls"]:
+                print("  ", ctrl["name"], "=", ctrl["value"])
 
     client = RackClient("192.168.1.100", 9000)
     client.on_order_change = on_order
     client.connect()
 
     # Or request manually:
-    labels = client.get_order()
+    slots = client.get_order()
 """
 
 import json
@@ -31,9 +34,9 @@ class RackClient:
         self.port = port
         self._sock = None
         self._connected = False
-        self._order = []
+        self._slots = []
 
-        # Callback for order changes
+        # Callback for order changes (receives list of slot dicts)
         self.on_order_change = None
 
     def connect(self):
@@ -147,7 +150,7 @@ class RackClient:
         self._send_frame(json.dumps(msg).encode())
 
     def get_order(self):
-        """Request current order from server."""
+        """Request current order from server. Returns list of slot dicts."""
         if not self._connected:
             return []
 
@@ -157,15 +160,20 @@ class RackClient:
         if response:
             data = json.loads(response)
             if data.get("event") == "order":
-                self._order = data.get("labels", [])
-                return self._order
+                self._slots = data.get("slots", [])
+                return self._slots
 
         return []
 
     @property
-    def order(self) -> list:
-        """Last known order."""
-        return self._order
+    def slots(self):
+        """Last known slots list."""
+        return self._slots
+
+    @property
+    def labels(self):
+        """Get just the labels from slots."""
+        return [s.get("label", "") for s in self._slots]
 
     def poll(self):
         """
@@ -181,9 +189,9 @@ class RackClient:
             try:
                 data = json.loads(response)
                 if data.get("event") == "order":
-                    self._order = data.get("labels", [])
+                    self._slots = data.get("slots", [])
                     if self.on_order_change:
-                        self.on_order_change(self._order)
+                        self.on_order_change(self._slots)
                     return True
             except:
                 pass
@@ -202,14 +210,16 @@ if __name__ == "__main__":
     host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 9000
 
-    def on_order(labels):
-        print("Order changed:", labels)
+    def on_order(slots):
+        print("Order changed:")
+        for slot in slots:
+            print(" -", slot.get("label", "?"))
 
     client = RackClient(host, port)
     client.on_order_change = on_order
 
     if client.connect():
-        print("Initial order:", client.order)
+        print("Initial labels:", client.labels)
         print("Listening for changes... (Ctrl+C to stop)")
         try:
             client.run_forever()
