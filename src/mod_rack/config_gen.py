@@ -46,7 +46,7 @@ join_audio_outputs = {join_audio_outputs}
 
 """
 
-_ROUTING_MODES = ["hard_bypass", "linear", "dual_track"]
+_ROUTING_MODES = ["hard_bypass", "linear", "dual_track", "patchbay"]
 
 
 class Args(argparse.Namespace):

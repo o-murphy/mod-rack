@@ -997,6 +997,9 @@ class Orchestrator:
         if self.mode != OrchestratorMode.MANAGER:
             return
 
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         with self._lock:
             # 1. Отримуємо "ідеальний" стан від менеджера
             desired = RoutingManager.calculate_chain_connections(
@@ -1024,6 +1027,9 @@ class Orchestrator:
 
     def _connect_pair(self, src: AnySlot, dst: AnySlot):
         """Проксі-метод для точкового з'єднання (наприклад, при видаленні плагіна)."""
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         pairs = RoutingManager.get_audio_connection_pairs(src, dst)
         for out_path, in_path in pairs:
             # Важливо: ми не додаємо в self._connections самі, чекаємо WS події
@@ -1031,6 +1037,9 @@ class Orchestrator:
 
     def _disconnect_everything(self):
         """Видаляє всі активні з'єднання, базуючись на актуальному кеші."""
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         with self._lock:
             if not self._connections:
                 return
