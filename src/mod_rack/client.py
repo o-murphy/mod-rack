@@ -48,10 +48,12 @@ __all__ = [
     "GraphPluginAddEvent",
     "GraphPluginRemoveEvent",
     "UnknownEvent",
+    "DEFAULT_SERVER_URL",
+    "DEFAULT_DEBOUNCE_DELAY",
 ]
 
 DEFAULT_SERVER_URL = "http://127.0.0.1:18181"
-
+DEFAULT_DEBOUNCE_DELAY = 0.1
 
 HEADERS = {
     "Accept": "application/json, text/plain, */*",

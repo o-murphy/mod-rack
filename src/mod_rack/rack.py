@@ -9,6 +9,7 @@ import weakref
 
 from mod_rack.config import Config, HardwareConfig, PluginConfig, RoutingMode
 from mod_rack.client import (
+    DEFAULT_DEBOUNCE_DELAY,
     GraphAddHwPortEvent,
     Client,
     GraphConnectEvent,
@@ -651,7 +652,7 @@ class Orchestrator:
         # Locks and flags
         self._lock = threading.RLock()
         self._reorder_timer: threading.Timer | None = None
-        self._debounce_delay: float = 0.1
+        self._debounce_delay: float = DEFAULT_DEBOUNCE_DELAY
         self._loading = True
         self._normalizing = False
 
@@ -829,9 +830,11 @@ class Orchestrator:
 
             if not plugin:
                 _Color.red(f"Can not load plugin: {event.label}, {event.uri}")
-                # TODO: maybe should remove it
-                # with self._lock:
-                #     self.client.effect_remove(event.label)
+                # Defer removal - server may not be ready yet
+                threading.Timer(
+                    DEFAULT_DEBOUNCE_DELAY,
+                    lambda: self.client.effect_remove(event.label),
+                ).start()
                 return
 
             # Створюємо слот
