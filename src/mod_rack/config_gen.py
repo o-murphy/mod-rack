@@ -1,5 +1,7 @@
 import argparse
+import json
 from pathlib import Path
+from typing import Literal
 from mod_rack.client import Client
 
 try:
@@ -25,12 +27,12 @@ url = "{url}"
 # join_audio_outputs = true
 
 [rack]
-routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
+routing_mode = "{routing_mode}"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
 
 
-###############################
-# --- MOD Desktop Plugins --- #
-###############################
+###################
+# --- Plugins --- #
+###################
 
 """
 
@@ -45,10 +47,12 @@ join_audio_outputs = {join_audio_outputs}
 
 """
 
+_ROUTING_MODES = ["hard_bypass", "linear", "dual_track"]
 
 class Args(argparse.Namespace):
     server: str
     output: Path
+    routing_mode: str
     no_fix: bool
     allow_all: bool
 
@@ -63,16 +67,18 @@ class _KnownPlugins:
                 item["uri"]: item for item in data["plugins"]
             }
 
-    def is_supported(self, plugin_info: dict):
-        if plugin_info["uri"] in self.known:
-            return True
-        return False
+    def is_supported(self, plugin_info: dict) -> bool:
+        return plugin_info["uri"] in self.known
 
-    def apply_fix(self, plugin_info: dict):
-        if plugin_info["uri"] in self.known:
-            plugin_info.update(self.known[plugin_info["uri"]])
-            plugin_info["join_audio_inputs"] = str(plugin_info["join_audio_inputs"]).lower() 
-            plugin_info["join_audio_outputs"] = str(plugin_info["join_audio_outputs"]).lower() 
+    def apply_fix(self, plugin_info: dict) -> dict:
+        if fix := self.known.get(plugin_info["uri"]):
+            plugin_info.update(fix)
+            plugin_info["join_audio_inputs"] = str(
+                plugin_info["join_audio_inputs"]
+            ).lower()
+            plugin_info["join_audio_outputs"] = str(
+                plugin_info["join_audio_outputs"]
+            ).lower()
         return plugin_info
 
 
@@ -89,6 +95,13 @@ def main():
         help="Output path",
         action="store",
         default="config.toml",
+    )
+    parser.add_argument(
+        "--routing-mode",
+        help="Routing mode",
+        choices=_ROUTING_MODES,
+        default="hard_bypass",
+        action="store",
     )
     parser.add_argument(
         "--no-fix",
@@ -111,10 +124,8 @@ def main():
 
         print("Fetched:", len(plugins_list))
 
-        parts = []
-        parts.append(header_fmt.format(url=client.base_url))
-
-        plugins = []
+        parts = [header_fmt.format(url=client.base_url, routing_mode=ns.routing_mode)]
+        parsed_count = 0
 
         for plugin in plugins_list:
             info_dict = {
@@ -132,30 +143,22 @@ def main():
 
             if not ns.no_fix:
                 info_dict = known.apply_fix(info_dict)
-            print(info_dict)
-            info = plugin_fmt.format(**info_dict).replace("'", '"')
-            plugins.append(info)
 
-        if ns.output.exists():
-            if ns.output.is_dir():
-                out = ns.output / "config.toml"
-            else:
-                out = ns.output
-        else:
-            out = ns.output
+            info_dict["disable_ports"] = json.dumps(info_dict["disable_ports"])
+            parts.append(plugin_fmt.format(**info_dict))
+            parsed_count += 1
 
-        parts.extend(plugins)
-
-        print("Parsed:", len(plugins))
+        out = ns.output / "config.toml" if ns.output.is_dir() else ns.output
         out = out.with_suffix(".toml")
+
+        print("Parsed:", parsed_count)
         with open(out, "w") as fp:
             fp.writelines(parts)
 
         parser.exit(0, f"Config saved to '{out}'\n")
 
     except Exception as err:
-        # parser.error(str(err))
-        raise
+        parser.error(str(err))
 
     parser.exit(0)
 
