@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "mod-rack"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,3 +26,9 @@ dev = [
     "toml>=0.10.2",
     "types-requests>=2.32.4.20260107",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/mod_rack/_version.py"
