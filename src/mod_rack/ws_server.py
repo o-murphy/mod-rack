@@ -73,9 +73,9 @@ class RackWSServer:
         orchestrator.on_rack_order_changed(self._on_order_changed)
 
         # Register for param changes
-        orchestrator.client.ws.on(GraphParamSetEvent, self._on_param_changed)
+        orchestrator.client.ws.on(GraphParamSetEvent, self._on_control_changed)
         orchestrator.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
-        orchestrator.client.ws.on(GraphOutputSetEvent, self._on_output_changed)
+        orchestrator.client.ws.on(GraphOutputSetEvent, self._on_control_changed)
 
     def _get_order_data(self) -> list[dict]:
         """Get current order as list of slot data with controls."""
@@ -135,24 +135,9 @@ class RackWSServer:
                 self._loop
             )
 
-    def _on_param_changed(self, event: GraphParamSetEvent) -> None:
+    def _on_control_changed(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
         print(f"[WS] param changed: {event.label}/{event.symbol} = {event.value}")
-        message = json.dumps({
-            "event": "param",
-            "label": event.label,
-            "symbol": event.symbol,
-            "value": event.value,
-        })
-
-        if self._loop and self._clients:
-            asyncio.run_coroutine_threadsafe(
-                self._broadcast(message),
-                self._loop
-            )
-
-    def _on_output_changed(self, event: GraphParamSetEvent) -> None:
-        """Called when a plugin parameter changes - broadcast to all clients."""
         message = json.dumps({
             "event": "param",
             "label": event.label,

@@ -593,8 +593,8 @@ class MainWindow(QMainWindow):
         self._param_changed_signal.connect(self._on_ws_param_changed)
         self._bypass_changed_signal.connect(self._on_ws_bypass_changed)
         self.rack.on_rack_order_changed(self._handle_rack_cb)
-        self.rack.client.ws.on(GraphParamSetEvent, self._forward_param_event)
-        self.rack.client.ws.on(GraphOutputSetEvent, self._forward_output_event)
+        self.rack.client.ws.on(GraphParamSetEvent, self._forward_control_event)
+        self.rack.client.ws.on(GraphOutputSetEvent, self._forward_control_event)
         self.rack.client.ws.on(GraphParamSetBypassEvent, self._forward_bypass_event)
 
         self.setWindowTitle("MOD Rack Controller")
@@ -757,11 +757,7 @@ class MainWindow(QMainWindow):
     # WebSocket event handlers (thread-safe via Qt signals)
     # =========================================================================
 
-    def _forward_param_event(self, event: GraphParamSetEvent):
-        """Forward WS event to main thread via signal."""
-        self._param_changed_signal.emit(event.label, event.symbol, event.value)
-
-    def _forward_output_event(self, event: GraphOutputSetEvent):
+    def _forward_control_event(self, event: GraphParamSetEvent | GraphOutputSetEvent):
         """Forward WS event to main thread via signal."""
         self._param_changed_signal.emit(event.label, event.symbol, event.value)
 

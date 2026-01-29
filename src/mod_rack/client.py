@@ -116,25 +116,25 @@ class ResetConnectionsEvent:
 
 @dataclass(frozen=True)
 class TransportEvent:
-    _any: Any
+    _any: Any = field(compare=False)
 
 
 @dataclass(frozen=True)
 class TrueBypassEvent:
-    _a: int
-    _b: int
+    _a: int = field(compare=False)
+    _b: int = field(compare=False)
 
 
 @dataclass(frozen=True)
 class SizeEvent:
-    _a: int
-    _b: int
+    _a: int = field(compare=False)
+    _b: int = field(compare=False)
 
 
 @dataclass(frozen=True)
 class PbSizeEvent:
-    x: int
-    y: int
+    x: int = field(compare=False)
+    y: int = field(compare=False)
 
 
 class PortType(Enum):
@@ -156,23 +156,23 @@ class GraphAddHwPortEvent:
 
 @dataclass(frozen=True)
 class GraphRemoveHwPortEvent:
-    name: str
+    name: str = field(compare=False)
 
 
 @dataclass(frozen=True)
 class GraphConnectEvent:
     """connect /graph/gx_duck_delay__ND258bdR/out /graph/gx_fuzz__4e4UwTyJ/in"""
 
-    src_path: str
-    dst_path: str
+    src_path: str = field(compare=False)
+    dst_path: str = field(compare=False)
 
 
 @dataclass(frozen=True)
 class GraphDisconnectEvent:
     """disconnect /graph/gx_duck_delay__ND258bdR/out /graph/gx_fuzz__4e4UwTyJ/in"""
 
-    src_path: str
-    dst_path: str
+    src_path: str = field(compare=False)
+    dst_path: str = field(compare=False)
 
 
 @dataclass(frozen=True)
@@ -375,22 +375,16 @@ class WsProtocol:
                 except ValueError:
                     return None
 
-            case ["param_set", inst, symbol, val, *_]:
+            case ["param_set" | "output_set" as cmd, inst, symbol, val, *_]:
                 try:
                     f_val = float(val)
                 except ValueError:
                     return None
                 label = inst.removeprefix(prefix)
-                if symbol == ":bypass":
-                    return GraphParamSetBypassEvent(label=label, bypassed=f_val > 0.5)
-                return GraphParamSetEvent(label=label, symbol=symbol, value=f_val)
-
-            case ["output_set", inst, symbol, val, *_]:
-                try:
-                    f_val = float(val)
-                except ValueError:
-                    return None
-                label = inst.removeprefix(prefix)
+                if cmd == "param_set":
+                    if symbol == ":bypass":
+                        return GraphParamSetBypassEvent(label=label, bypassed=f_val > 0.5)
+                    return GraphParamSetEvent(label=label, symbol=symbol, value=f_val)
                 return GraphOutputSetEvent(label=label, symbol=symbol, value=f_val)
 
             case [msg_type, *_]:
