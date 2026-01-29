@@ -48,7 +48,9 @@ class Plugin:
         self.label = label
 
         self._bypassed = False
-        self._config = config if config is not None else PluginConfig(self.label, self.uri)
+        self._config = (
+            config if config is not None else PluginConfig(self.label, self.uri)
+        )
         self._controls: dict[str, ControlPort] = {}
 
         # io setup

@@ -524,10 +524,14 @@ class WsConnection:
             return True
 
         # WebSocket specific errors
-        if hasattr(websocket, 'WebSocketBadStatusException'):
+        if hasattr(websocket, "WebSocketBadStatusException"):
             if isinstance(error, websocket.WebSocketBadStatusException):
                 # 401, 403, 404 - non-recoverable
-                if hasattr(error, 'status_code') and error.status_code in (401, 403, 404):
+                if hasattr(error, "status_code") and error.status_code in (
+                    401,
+                    403,
+                    404,
+                ):
                     return False
 
         # За замовчуванням - recoverable

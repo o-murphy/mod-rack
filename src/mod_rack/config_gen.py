@@ -1,11 +1,10 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Literal
 from mod_rack.client import Client
 
 try:
-    import tomllib
+    import tomllib  # type: ignore[import-not-found]  # Python 3.11+
 except ImportError:
     import tomli as tomllib
 
@@ -48,6 +47,7 @@ join_audio_outputs = {join_audio_outputs}
 """
 
 _ROUTING_MODES = ["hard_bypass", "linear", "dual_track"]
+
 
 class Args(argparse.Namespace):
     server: str
