@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Flag, auto
 from typing import Any
 
+from mod_rack.client import PortDirection
+
 
 __all__ = [
     "ControlProperties",
@@ -107,6 +109,9 @@ class ControlPort:
     name: str  # Display name
     short_name: str  # Abbreviated name
     index: int  # Port index in plugin
+
+    # Direction
+    direction: PortDirection
 
     # Value range
     minimum: float
@@ -247,7 +252,7 @@ class ControlPort:
         return formatted
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ControlPort":
+    def from_dict(cls, data: dict[str, Any], direction: PortDirection) -> "ControlPort":
         """Parse control port from API response."""
         ranges = data.get("ranges", {})
         units_data = data.get("units", {})
@@ -258,6 +263,7 @@ class ControlPort:
             name=data.get("name", ""),
             short_name=data.get("shortName", data.get("name", "")),
             index=data.get("index", 0),
+            direction=direction,
             minimum=float(ranges.get("minimum", 0.0)),
             maximum=float(ranges.get("maximum", 1.0)),
             default=float(ranges.get("default", 0.0)),
@@ -285,9 +291,24 @@ def parse_control_ports(effect_data: dict[str, Any]) -> list[ControlPort]:
     ports = effect_data.get("ports", {})
     control_ports = ports.get("control", {})
     inputs = control_ports.get("input", [])
+    outputs = control_ports.get("output", [])
 
-    return [
-        ControlPort.from_dict(port_data)
-        for port_data in inputs
-        if port_data.get("valid", True)
-    ]
+    controls = []
+
+    controls.extend(
+        [
+            ControlPort.from_dict(port_data, PortDirection.INPUT)
+            for port_data in inputs
+            if port_data.get("valid", True)
+        ]
+    )
+
+    controls.extend(
+        [
+            ControlPort.from_dict(port_data, PortDirection.OUTPUT)
+            for port_data in outputs
+            if port_data.get("valid", True)
+        ]
+    )
+
+    return controls

@@ -17,16 +17,18 @@ import websockets
 from websockets.server import WebSocketServerProtocol
 
 from mod_rack.client import GraphParamSetEvent, GraphParamSetBypassEvent
+from mod_rack.controls import ControlPort
 
 if TYPE_CHECKING:
     from mod_rack.rack import Orchestrator, PluginSlot
 
 
-def _serialize_control(ctrl) -> dict:
+def _serialize_control(ctrl: ControlPort) -> dict:
     """Serialize a ControlPort to dict for JSON."""
     return {
         "symbol": ctrl.symbol,
         "name": ctrl.name,
+        "direction": ctrl.direction.name,
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
         "default": ctrl.default,
