@@ -10,16 +10,24 @@ Usage:
             for ctrl in slot["controls"]:
                 print("  ", ctrl["name"], "=", ctrl["value"])
 
+    def on_param(label, symbol, value):
+        print("Param changed:", label, symbol, "=", value)
+
     client = RackClient("192.168.1.100", 9000)
     client.on_order_change = on_order
+    client.on_param_change = on_param
     client.connect()
 
     # Or request manually:
     slots = client.get_order()
+
+    # Local state auto-updates on param events
+    client.run_forever()
 """
 
 import json
 import socket
+import time
 
 
 class RackClient:
@@ -29,15 +37,23 @@ class RackClient:
     Connects to RackWSServer and receives order updates.
     """
 
-    def __init__(self, host, port=9000):
+    def __init__(self, host, port=9000, reconnect_delay=1):
         self.host = host
         self.port = port
+        self.reconnect_delay = reconnect_delay
         self._sock = None
         self._connected = False
         self._slots = []
 
         # Callback for order changes (receives list of slot dicts)
         self.on_order_change = None
+        # Callback for param changes (receives label, symbol, value)
+        self.on_param_change = None
+        # Callback for bypass changes (receives label, bypassed)
+        self.on_bypass_change = None
+        # Callback for connection state changes
+        self.on_connect = None
+        self.on_disconnect = None
 
     def connect(self):
         """Connect to WebSocket server."""
@@ -61,6 +77,8 @@ class RackClient:
 
             self._connected = True
             print("Connected to ws://" + self.host + ":" + str(self.port))
+            if self.on_connect:
+                self.on_connect()
             return True
 
         except Exception as e:
@@ -69,6 +87,7 @@ class RackClient:
 
     def disconnect(self):
         """Close connection."""
+        was_connected = self._connected
         if self._sock:
             try:
                 self._sock.close()
@@ -76,6 +95,8 @@ class RackClient:
                 pass
         self._connected = False
         self._sock = None
+        if was_connected and self.on_disconnect:
+            self.on_disconnect()
 
     def _send_frame(self, data):
         """Send WebSocket frame (masked, as client)."""
@@ -110,7 +131,8 @@ class RackClient:
         try:
             # Read first 2 bytes
             header = self._sock.recv(2)
-            if len(header) < 2:
+            if not header or len(header) < 2:
+                self.disconnect()
                 return None
 
             opcode = header[0] & 0x0F
@@ -129,7 +151,8 @@ class RackClient:
             while len(payload) < length:
                 chunk = self._sock.recv(length - len(payload))
                 if not chunk:
-                    break
+                    self.disconnect()
+                    return None
                 payload += chunk
 
             if opcode == 0x08:  # Close frame
@@ -143,6 +166,7 @@ class RackClient:
 
         except Exception as e:
             print("Recv error:", e)
+            self.disconnect()
             return None
 
     def _send(self, msg):
@@ -175,6 +199,24 @@ class RackClient:
         """Get just the labels from slots."""
         return [s.get("label", "") for s in self._slots]
 
+    def _update_param(self, label, symbol, value):
+        """Update a control value in local state."""
+        for slot in self._slots:
+            if slot.get("label") == label:
+                for ctrl in slot.get("controls", []):
+                    if ctrl.get("symbol") == symbol:
+                        ctrl["value"] = value
+                        return True
+        return False
+
+    def _update_bypass(self, label, bypassed):
+        """Update bypass state in local state."""
+        for slot in self._slots:
+            if slot.get("label") == label:
+                slot["bypassed"] = bypassed
+                return True
+        return False
+
     def poll(self):
         """
         Check for incoming messages (non-blocking if socket is non-blocking).
@@ -188,20 +230,47 @@ class RackClient:
         if response:
             try:
                 data = json.loads(response)
-                if data.get("event") == "order":
+                event = data.get("event")
+
+                if event == "order":
                     self._slots = data.get("slots", [])
                     if self.on_order_change:
                         self.on_order_change(self._slots)
+                    return True
+
+                elif event == "param":
+                    label = data.get("label")
+                    symbol = data.get("symbol")
+                    value = data.get("value")
+                    self._update_param(label, symbol, value)
+                    if self.on_param_change:
+                        self.on_param_change(label, symbol, value)
+                    return True
+
+                elif event == "bypass":
+                    label = data.get("label")
+                    bypassed = data.get("bypassed")
+                    self._update_bypass(label, bypassed)
+                    if self.on_bypass_change:
+                        self.on_bypass_change(label, bypassed)
                     return True
             except:
                 pass
 
         return False
 
-    def run_forever(self):
-        """Block and process messages until disconnected."""
-        while self._connected:
-            self.poll()
+    def run_forever(self, auto_reconnect=True):
+        """Block and process messages. Auto-reconnects on disconnect."""
+        while True:
+            while self._connected:
+                self.poll()
+
+            if not auto_reconnect:
+                break
+
+            print("Reconnecting in", self.reconnect_delay, "seconds...")
+            time.sleep(self.reconnect_delay)
+            self.connect()
 
 
 if __name__ == "__main__":
@@ -215,14 +284,29 @@ if __name__ == "__main__":
         for slot in slots:
             print(" -", slot.get("label", "?"))
 
+    def on_param(label, symbol, value):
+        print("Param:", label, symbol, "=", value)
+
+    def on_bypass(label, bypassed):
+        print("Bypass:", label, "=", bypassed)
+
+    def on_connect():
+        print("Connected!")
+
+    def on_disconnect():
+        print("Disconnected!")
+
     client = RackClient(host, port)
     client.on_order_change = on_order
+    client.on_param_change = on_param
+    client.on_bypass_change = on_bypass
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
 
-    if client.connect():
-        print("Initial labels:", client.labels)
-        print("Listening for changes... (Ctrl+C to stop)")
-        try:
-            client.run_forever()
-        except KeyboardInterrupt:
-            print("Disconnecting...")
-            client.disconnect()
+    print("Connecting... (Ctrl+C to stop)")
+    try:
+        client.connect()
+        client.run_forever(auto_reconnect=True)
+    except KeyboardInterrupt:
+        print("Stopping...")
+        client.disconnect()

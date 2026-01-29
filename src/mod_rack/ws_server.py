@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 import websockets
 from websockets.server import WebSocketServerProtocol
 
+from mod_rack.client import GraphParamSetEvent, GraphParamSetBypassEvent
+
 if TYPE_CHECKING:
     from mod_rack.rack import Orchestrator, PluginSlot
 
@@ -40,6 +42,7 @@ def _serialize_slot(slot: "PluginSlot") -> dict:
     """Serialize a PluginSlot with its controls to dict for JSON."""
     return {
         "label": slot.label,
+        "bypassed": slot.plugin.bypassed,
         "controls": [_serialize_control(ctrl) for ctrl in slot.plugin.controls.values()],
     }
 
@@ -67,6 +70,10 @@ class RackWSServer:
         # Register for order changes
         orchestrator.on_rack_order_changed(self._on_order_changed)
 
+        # Register for param changes
+        orchestrator.client.ws.on(GraphParamSetEvent, self._on_param_changed)
+        orchestrator.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
+
     def _get_order_data(self) -> list[dict]:
         """Get current order as list of slot data with controls."""
         return [_serialize_slot(slot) for slot in self.orchestrator.slots]
@@ -75,6 +82,35 @@ class RackWSServer:
         """Called when rack order changes - broadcast to all clients."""
         slots_data = [_serialize_slot(slot) for slot in slots]
         message = json.dumps({"event": "order", "slots": slots_data})
+
+        if self._loop and self._clients:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast(message),
+                self._loop
+            )
+
+    def _on_param_changed(self, event: GraphParamSetEvent) -> None:
+        """Called when a plugin parameter changes - broadcast to all clients."""
+        message = json.dumps({
+            "event": "param",
+            "label": event.label,
+            "symbol": event.symbol,
+            "value": event.value,
+        })
+
+        if self._loop and self._clients:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast(message),
+                self._loop
+            )
+
+    def _on_bypass_changed(self, event: GraphParamSetBypassEvent) -> None:
+        """Called when a plugin bypass state changes - broadcast to all clients."""
+        message = json.dumps({
+            "event": "bypass",
+            "label": event.label,
+            "bypassed": event.bypassed,
+        })
 
         if self._loop and self._clients:
             asyncio.run_coroutine_threadsafe(
