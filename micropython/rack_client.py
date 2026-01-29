@@ -189,6 +189,18 @@ class RackClient:
 
         return []
 
+    def set_param(self, label, symbol, value):
+        """Set a plugin parameter (only INPUT controls). Fire and forget."""
+        if not self._connected:
+            return
+        self._send({"cmd": "set_param", "label": label, "symbol": symbol, "value": value})
+
+    def set_bypass(self, label, bypassed):
+        """Set plugin bypass state. Fire and forget."""
+        if not self._connected:
+            return
+        self._send({"cmd": "set_bypass", "label": label, "bypassed": bypassed})
+
     @property
     def slots(self):
         """Last known slots list."""
@@ -305,8 +317,65 @@ if __name__ == "__main__":
 
     print("Connecting... (Ctrl+C to stop)")
     try:
-        client.connect()
-        client.run_forever(auto_reconnect=True)
+        if not client.connect():
+            print("Failed to connect")
+            sys.exit(1)
+
+        # Get initial order
+        slots = client.get_order()
+        if not slots:
+            print("No slots found")
+            sys.exit(1)
+
+        # Find first slot with an INPUT control
+        test_label = None
+        test_symbol = None
+        test_min = 0.0
+        test_max = 1.0
+        test_value = 0.5
+
+        for slot in slots:
+            for ctrl in slot.get("controls", []):
+                if ctrl.get("direction") == "INPUT":
+                    test_label = slot.get("label")
+                    test_symbol = ctrl.get("symbol")
+                    test_min = ctrl.get("minimum", 0.0)
+                    test_max = ctrl.get("maximum", 1.0)
+                    test_value = ctrl.get("value", (test_min + test_max) / 2)
+                    break
+            if test_label:
+                break
+
+        if not test_label:
+            print("No INPUT control found")
+            sys.exit(1)
+
+        print("Testing control:", test_label, test_symbol)
+        print("Range:", test_min, "-", test_max)
+
+        # Test loop: oscillate by +-0.5
+        direction = 1
+        step = 0.5
+
+        while True:
+            # Calculate new value
+            new_value = test_value + (step * direction)
+
+            # Clamp to range and reverse direction if needed
+            if new_value > test_max:
+                new_value = test_max
+                direction = -1
+            elif new_value < test_min:
+                new_value = test_min
+                direction = 1
+
+            # Set the parameter
+            print("Setting", test_symbol, "=", new_value)
+            client.set_param(test_label, test_symbol, new_value)
+            test_value = new_value
+
+            time.sleep(1)
+
     except KeyboardInterrupt:
         print("Stopping...")
         client.disconnect()

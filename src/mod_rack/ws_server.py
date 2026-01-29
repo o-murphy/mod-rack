@@ -81,6 +81,30 @@ class RackWSServer:
         """Get current order as list of slot data with controls."""
         return [_serialize_slot(slot) for slot in self.orchestrator.slots]
 
+    def _set_param(self, label: str, symbol: str, value: float) -> None:
+        """Set a plugin parameter. Only works for INPUT controls."""
+        from mod_rack.client import PortDirection
+
+        slot = self.orchestrator.get_slot_by_label(label)
+        if not slot:
+            return
+
+        plugin = slot.plugin
+        if symbol not in plugin.controls:
+            return
+
+        control = plugin.controls[symbol]
+        if control.direction != PortDirection.INPUT:
+            return
+
+        plugin.param_set(symbol, value)
+
+    def _set_bypass(self, label: str, bypassed: bool) -> None:
+        """Set plugin bypass state."""
+        slot = self.orchestrator.get_slot_by_label(label)
+        if slot:
+            slot.plugin.bypass(bypassed)
+
     def _on_order_changed(self, slots: list["PluginSlot"]) -> None:
         """Called when rack order changes - broadcast to all clients."""
         slots_data = [_serialize_slot(slot) for slot in slots]
@@ -168,6 +192,18 @@ class RackWSServer:
                     if cmd == "get_order":
                         slots_data = self._get_order_data()
                         await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
+
+                    elif cmd == "set_param":
+                        label = msg.get("label")
+                        symbol = msg.get("symbol")
+                        value = msg.get("value")
+                        self._set_param(label, symbol, value)
+
+                    elif cmd == "set_bypass":
+                        label = msg.get("label")
+                        bypassed = msg.get("bypassed", False)
+                        self._set_bypass(label, bypassed)
+
                     else:
                         await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
 
