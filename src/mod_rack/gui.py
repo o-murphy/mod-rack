@@ -8,7 +8,11 @@ import signal
 import sys
 from pathlib import Path
 
-from mod_rack.client import GraphOutputSetEvent, GraphParamSetBypassEvent, GraphParamSetEvent
+from mod_rack.client import (
+    GraphOutputSetEvent,
+    GraphParamSetBypassEvent,
+    GraphParamSetEvent,
+)
 from mod_rack.plugin import Plugin
 
 # Add src to path

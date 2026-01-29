@@ -148,31 +148,57 @@ class PortDirection(Enum):
 
 
 @dataclass(frozen=True)
-class GraphAddHwPortEvent:
+class _BaseHwPortEvent:
     name: str
-    port_type: PortType
-    direction: PortDirection
+
+    def __eq__(self, other):
+        # Порівнюємо тільки за іменем порту
+        if isinstance(other, _BaseHwPortEvent):
+            return self.name == other.name
+        return False
+
+    def __hash__(self):
+        return hash(self.name)
 
 
 @dataclass(frozen=True)
-class GraphRemoveHwPortEvent:
-    name: str = field(compare=False)
+class GraphAddHwPortEvent(_BaseHwPortEvent):
+    port_type: PortType = field(compare=False)
+    direction: PortDirection = field(compare=False)
 
 
 @dataclass(frozen=True)
-class GraphConnectEvent:
+class GraphRemoveHwPortEvent(_BaseHwPortEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class _BaseGraphConnectionEvent:
+    src_path: str
+    dst_path: str
+
+    def __eq__(self, other):
+        if isinstance(other, _BaseGraphConnectionEvent):
+            return self.src_path == other.src_path and self.dst_path == other.dst_path
+        return False
+
+    def __hash__(self):
+        # Хешуємо кортеж із полів, щоб однакові дані давали однаковий хеш
+        return hash((self.src_path, self.dst_path))
+
+
+@dataclass(frozen=True)
+class GraphConnectEvent(_BaseGraphConnectionEvent):
     """connect /graph/gx_duck_delay__ND258bdR/out /graph/gx_fuzz__4e4UwTyJ/in"""
 
-    src_path: str = field(compare=False)
-    dst_path: str = field(compare=False)
+    pass
 
 
 @dataclass(frozen=True)
-class GraphDisconnectEvent:
+class GraphDisconnectEvent(_BaseGraphConnectionEvent):
     """disconnect /graph/gx_duck_delay__ND258bdR/out /graph/gx_fuzz__4e4UwTyJ/in"""
 
-    src_path: str = field(compare=False)
-    dst_path: str = field(compare=False)
+    pass
 
 
 @dataclass(frozen=True)
@@ -209,16 +235,28 @@ class UnknownEvent:
 
 
 @dataclass(frozen=True)
-class GraphPluginAddEvent:
+class _BasePluginEvent:
     label: str
+
+    def __eq__(self, other):
+        if isinstance(other, _BasePluginEvent):
+            return self.label == other.label
+        return False
+
+    def __hash__(self):
+        return hash(self.label)
+
+
+@dataclass(frozen=True)
+class GraphPluginAddEvent(_BasePluginEvent):
     uri: str = field(compare=False)
     x: float = field(compare=False, default=0)
     y: float = field(compare=False, default=0)
 
 
 @dataclass(frozen=True)
-class GraphPluginRemoveEvent:
-    label: str
+class GraphPluginRemoveEvent(_BasePluginEvent):
+    pass
 
 
 # --------------------
@@ -289,7 +327,10 @@ class WsProtocol:
                     pass
 
             case ["data_ready", value, *_]:
-                return DataReadyEvent(value)
+                try:
+                    return DataReadyEvent(int(value))
+                except ValueError:
+                    pass
 
             case ["loading_start", *_]:
                 # received 2 values like (1, 1) but we ignoring it
@@ -383,7 +424,9 @@ class WsProtocol:
                 label = inst.removeprefix(prefix)
                 if cmd == "param_set":
                     if symbol == ":bypass":
-                        return GraphParamSetBypassEvent(label=label, bypassed=f_val > 0.5)
+                        return GraphParamSetBypassEvent(
+                            label=label, bypassed=f_val > 0.5
+                        )
                     return GraphParamSetEvent(label=label, symbol=symbol, value=f_val)
                 return GraphOutputSetEvent(label=label, symbol=symbol, value=f_val)
 
