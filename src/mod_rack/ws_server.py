@@ -16,17 +16,19 @@ from typing import TYPE_CHECKING
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from mod_rack.client import GraphParamSetEvent, GraphParamSetBypassEvent
+from mod_rack.client import GraphOutputSetEvent, GraphParamSetEvent, GraphParamSetBypassEvent
+from mod_rack.controls import ControlPort
 
 if TYPE_CHECKING:
     from mod_rack.rack import Orchestrator, PluginSlot
 
 
-def _serialize_control(ctrl) -> dict:
+def _serialize_control(ctrl: ControlPort) -> dict:
     """Serialize a ControlPort to dict for JSON."""
     return {
         "symbol": ctrl.symbol,
         "name": ctrl.name,
+        "direction": ctrl.direction.name,
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
         "default": ctrl.default,
@@ -71,12 +73,56 @@ class RackWSServer:
         orchestrator.on_rack_order_changed(self._on_order_changed)
 
         # Register for param changes
-        orchestrator.client.ws.on(GraphParamSetEvent, self._on_param_changed)
+        orchestrator.client.ws.on(GraphParamSetEvent, self._on_control_changed)
         orchestrator.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
+        orchestrator.client.ws.on(GraphOutputSetEvent, self._on_control_changed)
 
     def _get_order_data(self) -> list[dict]:
         """Get current order as list of slot data with controls."""
         return [_serialize_slot(slot) for slot in self.orchestrator.slots]
+
+    def _set_param(self, label: str, symbol: str, value: float) -> None:
+        """Set a plugin parameter. Only works for INPUT controls."""
+        from mod_rack.client import PortDirection
+
+        print(f"[WS] _set_param: {label}/{symbol} = {value}")
+
+        slot = self.orchestrator.get_slot_by_label(label)
+        if not slot:
+            print(f"[WS] slot not found: {label}")
+            return
+
+        plugin = slot.plugin
+        if symbol not in plugin.controls:
+            print(f"[WS] symbol not found: {symbol}")
+            return
+
+        control = plugin.controls[symbol]
+        if control.direction != PortDirection.INPUT:
+            print(f"[WS] not INPUT: {symbol}")
+            return
+
+        plugin.param_set(symbol, value)
+        print("[WS] param_set done")
+
+        # Manually broadcast since MOD doesn't echo back our own changes
+        message = json.dumps({
+            "event": "param",
+            "label": label,
+            "symbol": symbol,
+            "value": value,
+        })
+        if self._loop and self._clients:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast(message),
+                self._loop
+            )
+
+    def _set_bypass(self, label: str, bypassed: bool) -> None:
+        """Set plugin bypass state."""
+        slot = self.orchestrator.get_slot_by_label(label)
+        if slot:
+            slot.plugin.bypass(bypassed)
 
     def _on_order_changed(self, slots: list["PluginSlot"]) -> None:
         """Called when rack order changes - broadcast to all clients."""
@@ -89,8 +135,9 @@ class RackWSServer:
                 self._loop
             )
 
-    def _on_param_changed(self, event: GraphParamSetEvent) -> None:
+    def _on_control_changed(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
+        print(f"[WS] param changed: {event.label}/{event.symbol} = {event.value}")
         message = json.dumps({
             "event": "param",
             "label": event.label,
@@ -150,6 +197,18 @@ class RackWSServer:
                     if cmd == "get_order":
                         slots_data = self._get_order_data()
                         await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
+
+                    elif cmd == "set_param":
+                        label = msg.get("label")
+                        symbol = msg.get("symbol")
+                        value = msg.get("value")
+                        self._set_param(label, symbol, value)
+
+                    elif cmd == "set_bypass":
+                        label = msg.get("label")
+                        bypassed = msg.get("bypassed", False)
+                        self._set_bypass(label, bypassed)
+
                     else:
                         await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
 

@@ -8,7 +8,7 @@ import signal
 import sys
 from pathlib import Path
 
-from mod_rack.client import GraphParamSetBypassEvent, GraphParamSetEvent
+from mod_rack.client import GraphOutputSetEvent, GraphParamSetBypassEvent, GraphParamSetEvent
 from mod_rack.plugin import Plugin
 
 # Add src to path
@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 
 from mod_rack import Config, Rack, ControlPort, DEFAULT_SERVER_URL
+from mod_rack.client import PortDirection
 from mod_rack.rack import OrchestratorMode
 
 
@@ -234,8 +235,37 @@ class IntegerControl(ControlWidget):
         self.value_label.setText(self.control.format_value(value))
 
 
+class MeterControl(ControlWidget):
+    """Read-only label for output controls (meters, indicators)."""
+
+    def __init__(self, control: ControlPort, parent=None):
+        super().__init__(control, parent)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        # Name label
+        self.label = QLabel(control.name)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
+        # Value display (normalized 0.0-1.0)
+        normalized = control.normalize(control.value)
+        self.value_label = QLabel(f"{normalized:.2f}")
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(self.value_label)
+
+    def _set_widget_value(self, value: float):
+        normalized = self.control.normalize(value)
+        self.value_label.setText(f"{normalized:.2f}")
+
+
 def create_control_widget(control: ControlPort, parent=None) -> ControlWidget:
     """Factory function to create appropriate widget for control type."""
+    # Output controls are read-only meters
+    if control.direction == PortDirection.OUTPUT:
+        return MeterControl(control, parent)
     if control.is_toggled:
         return ToggleControl(control, parent)
     if control.is_enumeration:
@@ -563,7 +593,8 @@ class MainWindow(QMainWindow):
         self._param_changed_signal.connect(self._on_ws_param_changed)
         self._bypass_changed_signal.connect(self._on_ws_bypass_changed)
         self.rack.on_rack_order_changed(self._handle_rack_cb)
-        self.rack.client.ws.on(GraphParamSetEvent, self._forward_param_event)
+        self.rack.client.ws.on(GraphParamSetEvent, self._forward_control_event)
+        self.rack.client.ws.on(GraphOutputSetEvent, self._forward_control_event)
         self.rack.client.ws.on(GraphParamSetBypassEvent, self._forward_bypass_event)
 
         self.setWindowTitle("MOD Rack Controller")
@@ -726,7 +757,7 @@ class MainWindow(QMainWindow):
     # WebSocket event handlers (thread-safe via Qt signals)
     # =========================================================================
 
-    def _forward_param_event(self, event: GraphParamSetEvent):
+    def _forward_control_event(self, event: GraphParamSetEvent | GraphOutputSetEvent):
         """Forward WS event to main thread via signal."""
         self._param_changed_signal.emit(event.label, event.symbol, event.value)
 

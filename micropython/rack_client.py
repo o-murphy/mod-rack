@@ -127,47 +127,41 @@ class RackClient:
         self._sock.send(bytes(frame))
 
     def _recv_frame(self):
-        """Receive WebSocket frame."""
-        try:
-            # Read first 2 bytes
-            header = self._sock.recv(2)
-            if not header or len(header) < 2:
-                self.disconnect()
-                return None
-
-            opcode = header[0] & 0x0F
-            length = header[1] & 0x7F
-
-            # Handle extended length
-            if length == 126:
-                ext = self._sock.recv(2)
-                length = (ext[0] << 8) | ext[1]
-            elif length == 127:
-                ext = self._sock.recv(8)
-                length = int.from_bytes(ext, "big")
-
-            # Server frames are not masked
-            payload = b""
-            while len(payload) < length:
-                chunk = self._sock.recv(length - len(payload))
-                if not chunk:
-                    self.disconnect()
-                    return None
-                payload += chunk
-
-            if opcode == 0x08:  # Close frame
-                self._connected = False
-                return None
-
-            if opcode == 0x01:  # Text frame
-                return payload.decode()
-
-            return None
-
-        except Exception as e:
-            print("Recv error:", e)
+        """Receive WebSocket frame. Raises OSError on timeout/EAGAIN."""
+        # Read first 2 bytes (may raise OSError EAGAIN in non-blocking mode)
+        header = self._sock.recv(2)
+        if not header or len(header) < 2:
             self.disconnect()
             return None
+
+        opcode = header[0] & 0x0F
+        length = header[1] & 0x7F
+
+        # Handle extended length
+        if length == 126:
+            ext = self._sock.recv(2)
+            length = (ext[0] << 8) | ext[1]
+        elif length == 127:
+            ext = self._sock.recv(8)
+            length = int.from_bytes(ext, "big")
+
+        # Server frames are not masked
+        payload = b""
+        while len(payload) < length:
+            chunk = self._sock.recv(length - len(payload))
+            if not chunk:
+                self.disconnect()
+                return None
+            payload += chunk
+
+        if opcode == 0x08:  # Close frame
+            self._connected = False
+            return None
+
+        if opcode == 0x01:  # Text frame
+            return payload.decode()
+
+        return None
 
     def _send(self, msg):
         """Send JSON message."""
@@ -188,6 +182,18 @@ class RackClient:
                 return self._slots
 
         return []
+
+    def set_param(self, label, symbol, value):
+        """Set a plugin parameter (only INPUT controls). Fire and forget."""
+        if not self._connected:
+            return
+        self._send({"cmd": "set_param", "label": label, "symbol": symbol, "value": value})
+
+    def set_bypass(self, label, bypassed):
+        """Set plugin bypass state. Fire and forget."""
+        if not self._connected:
+            return
+        self._send({"cmd": "set_bypass", "label": label, "bypassed": bypassed})
 
     @property
     def slots(self):
@@ -217,16 +223,25 @@ class RackClient:
                 return True
         return False
 
-    def poll(self):
+    def poll(self, timeout=0):
         """
-        Check for incoming messages (non-blocking if socket is non-blocking).
+        Check for incoming messages (non-blocking by default).
 
         Returns True if a message was received.
         """
-        if not self._connected:
+        if not self._connected or not self._sock:
             return False
 
-        response = self._recv_frame()
+        # Set timeout for non-blocking read
+        self._sock.settimeout(timeout)
+        try:
+            response = self._recv_frame()
+        except OSError:
+            # No data available (timeout)
+            return False
+        finally:
+            # Restore blocking mode for other operations
+            self._sock.settimeout(None)
         if response:
             try:
                 data = json.loads(response)
@@ -305,8 +320,68 @@ if __name__ == "__main__":
 
     print("Connecting... (Ctrl+C to stop)")
     try:
-        client.connect()
-        client.run_forever(auto_reconnect=True)
+        if not client.connect():
+            print("Failed to connect")
+            sys.exit(1)
+
+        # Get initial order
+        slots = client.get_order()
+        if not slots:
+            print("No slots found")
+            sys.exit(1)
+
+        # Find first slot with an INPUT control
+        test_label = None
+        test_symbol = None
+        test_min = 0.0
+        test_max = 1.0
+        test_value = 0.5
+
+        for slot in slots:
+            for ctrl in slot.get("controls", []):
+                if ctrl.get("direction") == "INPUT":
+                    test_label = slot.get("label")
+                    test_symbol = ctrl.get("symbol")
+                    test_min = ctrl.get("minimum", 0.0)
+                    test_max = ctrl.get("maximum", 1.0)
+                    test_value = ctrl.get("value", (test_min + test_max) / 2)
+                    break
+            if test_label:
+                break
+
+        if not test_label:
+            print("No INPUT control found")
+            sys.exit(1)
+
+        print("Testing control:", test_label, test_symbol)
+        print("Range:", test_min, "-", test_max)
+
+        # Test loop: oscillate by +-0.5
+        direction = 1
+        step = 0.5
+
+        while True:
+            # Calculate new value
+            new_value = test_value + (step * direction)
+
+            # Clamp to range and reverse direction if needed
+            if new_value > test_max:
+                new_value = test_max
+                direction = -1
+            elif new_value < test_min:
+                new_value = test_min
+                direction = 1
+
+            # Set the parameter
+            print("Setting", test_symbol, "=", new_value)
+            client.set_param(test_label, test_symbol, new_value)
+            test_value = new_value
+
+            # Poll for responses
+            time.sleep(0.1)
+            client.poll()
+            time.sleep(0.1)
+
     except KeyboardInterrupt:
         print("Stopping...")
         client.disconnect()
