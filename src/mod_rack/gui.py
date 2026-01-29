@@ -34,7 +34,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QDialogButtonBox,
     QMenu,
-    QProgressBar,
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
@@ -237,9 +236,7 @@ class IntegerControl(ControlWidget):
 
 
 class MeterControl(ControlWidget):
-    """Read-only progress bar for output controls (meters, indicators)."""
-
-    METER_STEPS = 1000
+    """Read-only label for output controls (meters, indicators)."""
 
     def __init__(self, control: ControlPort, parent=None):
         super().__init__(control, parent)
@@ -247,31 +244,21 @@ class MeterControl(ControlWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Label
+        # Name label
         self.label = QLabel(control.name)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.label)
 
-        # Progress bar (read-only)
-        self.meter = QProgressBar()
-        self.meter.setRange(0, self.METER_STEPS)
-        self.meter.setValue(self._value_to_meter(control.value))
-        self.meter.setTextVisible(False)
-        layout.addWidget(self.meter)
-
-        # Value display
-        self.value_label = QLabel(control.format_value())
+        # Value display (normalized 0.0-1.0)
+        normalized = control.normalize(control.value)
+        self.value_label = QLabel(f"{normalized:.2f}")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(self.value_label)
 
-    def _value_to_meter(self, value: float) -> int:
-        """Convert actual value to meter position."""
-        normalized = self.control.normalize(value)
-        return int(normalized * self.METER_STEPS)
-
     def _set_widget_value(self, value: float):
-        self.meter.setValue(self._value_to_meter(value))
-        self.value_label.setText(self.control.format_value(value))
+        normalized = self.control.normalize(value)
+        self.value_label.setText(f"{normalized:.2f}")
 
 
 def create_control_widget(control: ControlPort, parent=None) -> ControlWidget:
