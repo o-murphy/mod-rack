@@ -1,0 +1,1867 @@
+###########################
+# --- MOD RACK CONFIG --- #
+###########################
+
+[server]
+url = "http://127.0.0.1:18181"
+
+[hardware]
+# disable_ports = ["capture_1"] #, "capture_2"]
+# All-to-all routing: connect all hardware inputs to all first plugin inputs
+# join_audio_inputs = true
+# All-to-all routing: connect all last plugin outputs to all hardware outputs
+# join_audio_outputs = true
+
+[rack]
+routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
+allow_all_plugins = true
+
+###############################
+# --- MOD Desktop Plugins --- #
+###############################
+
+[[plugin]]
+name="AIDA-X"
+brand="Aida DSP"
+uri="http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic"
+category="['Simulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Kars"
+brand="DISTRHO"
+uri="http://distrho.sf.net/plugins/Kars"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MVerb"
+brand="DISTRHO"
+uri="http://distrho.sf.net/plugins/MVerb"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Nekobi"
+brand="DISTRHO"
+uri="http://distrho.sf.net/plugins/Nekobi"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Ping Pong Pan"
+brand="DISTRHO"
+uri="http://distrho.sf.net/plugins/PingPongPan"
+category="['Spatial']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Auto-wah"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/autowah"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CS Chorus 1"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/cs_chorus1"
+category="['Modulator', 'Chorus']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CS Chorus 2"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/cs_chorus2"
+category="['Modulator', 'Chorus']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CS Phaser 1 with LFO"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/cs_phaser1_lfo"
+category="['Modulator', 'Phaser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="reverb"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/reverb"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Triple chorus"
+brand="FOMP"
+uri="http://drobilla.net/plugins/fomp/triple_chorus"
+category="['Modulator', 'Chorus']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="setBfree DSP Tonewheel Organ"
+brand="x42"
+uri="http://gareus.org/oss/lv2/b_synth"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="setBfree Whirl Speaker"
+brand="x42"
+uri="http://gareus.org/oss/lv2/b_whirl#mod"
+category="['Modulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Autotune"
+brand="x42"
+uri="http://gareus.org/oss/lv2/fat1"
+category="['Spectral', 'Pitch Shifter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="x42-eq - Parametric Equalizer Mono"
+brand="x42"
+uri="http://gareus.org/oss/lv2/fil4#mono"
+category="['Filter', 'Equaliser', 'Parametric']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="x42-eq - Parametric Equalizer Stereo"
+brand="x42"
+uri="http://gareus.org/oss/lv2/fil4#stereo"
+category="['Filter', 'Equaliser', 'Parametric']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Clock Generator"
+brand="x42"
+uri="http://gareus.org/oss/lv2/mclk"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI CC to Note"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#cctonote"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Channel Filter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#channelfilter"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Channel Map"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#channelmap"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Enforce Scale"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#enforcescale"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Event Filter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#eventblocker"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Key-Range Filter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#keyrange"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Keysplit"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#keysplit"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI CC Map"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#mapcc"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Note/Channel Map"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#mapkeychannel"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Note Transpose"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#mapkeyscale"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Chord"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#midichord"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Delayline"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#mididelay"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Channel Unisono"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#mididup"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Strum"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#midistrum"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Chromatic Transpose"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#miditranspose"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Monophonic Legato"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#monolegato"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Remove Active Sensing"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#noactivesensing"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Duplicate Blocker"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#nodup"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Note to CC"
+brand="Robin Gareus"
+uri="http://gareus.org/oss/lv2/midifilter#notetocc"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Note Toggle"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#notetoggle"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI N-Tap Delay"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#ntapdelay"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Simple Channel Filter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#onechannelfilter"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Quantization"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#quantize"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Velocity Randomization"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#randvelocity"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Scale CC Value"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#scalecc"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Sostenuto"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#sostenuto"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Velocity-Range Filter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#velocityrange"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Velocity Adjust"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midifilter#velocityscale"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Generator"
+brand="x42"
+uri="http://gareus.org/oss/lv2/midigen"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Level Meter"
+brand="x42"
+uri="http://gareus.org/oss/lv2/modmeter"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Spectrum Analyzer"
+brand="x42"
+uri="http://gareus.org/oss/lv2/modspectre"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Step Sequencer16x8"
+brand="x42"
+uri="http://gareus.org/oss/lv2/stepseq#s16n8"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Step Sequencer32x8"
+brand="x42"
+uri="http://gareus.org/oss/lv2/stepseq#s32n8"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Step Sequencer8x16"
+brand="x42"
+uri="http://gareus.org/oss/lv2/stepseq#s8n16"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Step Sequencer8x4"
+brand="x42"
+uri="http://gareus.org/oss/lv2/stepseq#s8n4"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI Step Sequencer8x8"
+brand="x42"
+uri="http://gareus.org/oss/lv2/stepseq#s8n8"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TinyGain Mono"
+brand="x42"
+uri="http://gareus.org/oss/lv2/tinygain#mono"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TinyGain Stereo"
+brand="x42"
+uri="http://gareus.org/oss/lv2/tinygain#stereo"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Instrument Tuner"
+brand="x42"
+uri="http://gareus.org/oss/lv2/tuna#mod"
+category="['Utility', 'Analyser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Stereo X-Fade"
+brand="x42"
+uri="http://gareus.org/oss/lv2/xfade"
+category="['Utility', 'Mixer']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS Envelope"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/env"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS LFO2 - Freq"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/lfo2_freq"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS VCA Exp"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/vcaexp"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS VCA Lin"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/vcalin"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS VCF"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/vcf"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AMS VCO3"
+brand="Aurelien Leblond"
+uri="http://github.com/blablack/ams-lv2/vco3"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Neural Amp Modeler"
+brand="Mike Oliphant"
+uri="http://github.com/mikeoliphant/neural-amp-modeler-lv2"
+category="['Simulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="GxQuack"
+brand="Guitarix"
+uri="http://guitarix.sourceforge.net/plugins/gx_quack_#_quack_"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="abGate"
+brand="A. Bruzas"
+uri="http://hippie.lt/lv2/gate"
+category="['Dynamics', 'Gate']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Compressor (mono)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/compressor/mono"
+category="['Dynamics', 'Compressor']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Compressor (stereo)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/compressor/stereo"
+category="['Dynamics', 'Compressor']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Delay Munge (mono in)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/delay/mono"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Delay Munge (sum L+R in)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/delay/sum"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Stereo Phaser (mono in)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/phaser/mono"
+category="['Modulator', 'Phaser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Stereo Phaser (stereo in)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/phaser/stereo"
+category="['Modulator', 'Phaser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Invada Stereo Phaser (sum L+R in)"
+brand="Invada"
+uri="http://invadarecords.com/plugins/lv2/phaser/sum"
+category="['Modulator', 'Phaser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Black Pearl 4A"
+brand="AV Linux"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_Black_Pearl_4A"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Black Pearl 4B"
+brand="AV Linux"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_Black_Pearl_4B"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Black Pearl 5"
+brand="AV Linux"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_Black_Pearl_5"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Bass"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidBass"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Brass"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidBrass"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Chromatic Percussion"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidChromPerc"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Drums"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidDrums"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Ensemble"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidEnsemble"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Ethnic"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidEthnic"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Guitars"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidGuitars"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Organs"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidOrgans"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Percussion"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidPercussion"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Pianos"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidPianos"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Pipes"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidPipes"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Reeds"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidReeds"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid SoundFX"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidSoundFX"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid Strings"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidStrings"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid SynthFX"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidSynthFX"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid SynthLeads"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidSynthLeads"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Fluid SynthPads"
+brand="FluidGM"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_FluidSynthPads"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Red Zeppelin 4"
+brand="AV Linux"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_Red_Zeppelin_4"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Red Zeppelin 5"
+brand="AV Linux"
+uri="http://kxstudio.linuxaudio.org/plugins/FluidPlug_Red_Zeppelin_5"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Audio File"
+brand="falkTX"
+uri="http://kxstudio.sf.net/carla/plugins/audiofile"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI File"
+brand="falkTX"
+uri="http://kxstudio.sf.net/carla/plugins/midifile"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* AutoFilter"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/AutoFilter"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* Click - Metronome"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/Click"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* PhaserII - Mono phaser modulated by a Lorenz fractal"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/PhaserII"
+category="['Modulator', 'Phaser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* Plate - Versatile plate reverb"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/Plate"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* PlateX2 - Stereo in/out Versatile plate reverb"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/PlateX2"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* Scape - Stereo delay + Filters"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/Scape"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* Spice"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/Spice"
+category="['Dynamics']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* SpiceX2"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/SpiceX2"
+category="['Dynamics']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* White - White noise generator"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/White"
+category="['Generator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="C* Wider - Stereo image Synthesis"
+brand="CAPS"
+uri="http://moddevices.com/plugins/caps/Wider"
+category="['Spatial']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA BeatBox"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/BeatBox"
+category="['Generator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA DX10"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/DX10"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA Detune"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/Detune"
+category="['Spectral', 'Pitch Shifter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA ePiano"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/EPiano"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA JX10"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/JX10"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA Piano"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/Piano"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA Shepard"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/Shepard"
+category="['Generator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA SubSynth"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/SubSynth"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA ThruZero"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/ThruZero"
+category="['Modulator', 'Flanger']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MDA Vocoder"
+brand="MDA"
+uri="http://moddevices.com/plugins/mda/Vocoder"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="BandPassFilter"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/BandPassFilter"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Open Big Muff"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/BigMuffPi"
+category="['Distortion']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Capo"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Capo"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CrossOver 2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/CrossOver2"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CrossOver 3"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/CrossOver3"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="DS1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/DS1"
+category="['Distortion']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Drop"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Drop"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Gain"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Gain"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Gain 2x2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Gain2x2"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Harmonizer"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Harmonizer"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Harmonizer2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/Harmonizer2"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="HighPassFilter"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/HighPassFilter"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="LowPassFilter"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/LowPassFilter"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 1-2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/MIDI-Switchbox_1-2"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Super Capo"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/SuperCapo"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Super Whammy"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/SuperWhammy"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Switchbox 1-2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/SwitchBox2"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="ToggleSwitch"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/ToggleSwitch4"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Arpeggiator"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/arpeggiator"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Logic Operators"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/logic-operators"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 1-2 2C"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-switchbox_1-2_2C"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 1-3"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-switchbox_1-3"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 2-1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-switchbox_2-1"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 2-1 2C"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-switchbox_2-1_2C"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI SwitchBox 3-1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-switchbox_3-1"
+category="['MIDI']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI to CV mono"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-to-cv-mono"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="MIDI to CV Poly"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/midi-to-cv-poly"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Mixer"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mixer"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Mixer Stereo"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mixer-stereo"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Audio to CV"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-audio-to-cv"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Multi Button to CV"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-button-to-cv"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV ABS"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-abs"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Attenuverter Booster"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-attenuverter"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Clock"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-clock"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Control to CV"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-control"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Gate"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-gate"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV meter"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-meter"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Parameter Modulation"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-parameter-modulation"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Random Generator"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-random"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Range Divider"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-range"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Round"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-round"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Slew Rate Limiter"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-slew"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Switchbox 1-2"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-switch1"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Switchbox 2-1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-switch2"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Switchbox 1-3"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-switch3"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="CV Switchbox 3-1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/mod-cv-switch4"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Switchbox 1-2 ST"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/switchbox_1-2_st"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Switchbox 2-1"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/switchbox_2-1"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Switchbox 2-1 ST"
+brand="MOD"
+uri="http://moddevices.com/plugins/mod-devel/switchbox_2-1_st"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="SooperLooper"
+brand="MOD"
+uri="http://moddevices.com/plugins/sooperlooper"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="SooperLooper 2x2"
+brand="MOD"
+uri="http://moddevices.com/plugins/sooperlooper-2x2"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Chorus/Flanger"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/chorusflanger"
+category="['Modulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Fractal Doubler"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/doubler"
+category="['Spectral']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Stereo Echo"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/echo"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Pink/Fractal Noise"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/pinknoise"
+category="['Generator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Reflector"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/reflector"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Tremolo"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/tremolo"
+category="['Modulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="TAP Tubewarmth"
+brand="TAP"
+uri="http://moddevices.com/plugins/tap/tubewarmth"
+category="['Simulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Notes"
+brand="OMK"
+uri="http://open-music-kontrollers.ch/lv2/notes#notes"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="avocado"
+brand="remaincalm.org"
+uri="http://remaincalm.org/plugins/avocado"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="floaty"
+brand="remaincalm.org"
+uri="http://remaincalm.org/plugins/floaty"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="mud"
+brand="remaincalm.org"
+uri="http://remaincalm.org/plugins/mud"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="paranoia"
+brand="remaincalm.org"
+uri="http://remaincalm.org/plugins/paranoia"
+category="['Distortion']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Filta"
+brand="OpenAV"
+uri="http://www.openavproductions.com/artyfx#filta"
+category="['Filter']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Kuiza"
+brand="OpenAV"
+uri="http://www.openavproductions.com/artyfx#kuiza"
+category="['Filter', 'Equaliser']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Roomy"
+brand="OpenAV"
+uri="http://www.openavproductions.com/artyfx#roomy"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Bollie Delay"
+brand="Bollie"
+uri="https://ca9.eu/lv2/bolliedelay"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="AudioToCV Pitch"
+brand="MOD/DISTRHO"
+uri="https://distrho.kx.studio/plugins/pitchtracking#cv"
+category="['ControlVoltage']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Schrammel OJD"
+brand="Schrammel"
+uri="https://github.com/JanosGit/Schrammel_OJD"
+category="['Distortion']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Record-Mono Mini"
+brand="brummer"
+uri="https://github.com/brummer10/screcord#mono_record_mini"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Record-Quad Mini"
+brand="brummer"
+uri="https://github.com/brummer10/screcord#quad_record_mini"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Record-Stereo Mini"
+brand="brummer"
+uri="https://github.com/brummer10/screcord#stereo_record_mini"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="ChowCentaur"
+brand="chowdsp"
+uri="https://github.com/jatinchowdhury18/KlonCentaur"
+category="['Distortion']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Dragonfly Hall Reverb"
+brand="Dragonfly"
+uri="https://github.com/michaelwillis/dragonfly-reverb"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Harmless"
+brand="SHIRO"
+uri="https://github.com/ninodewit/SHIRO-Plugins/plugins/harmless"
+category="['Modulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Larynx"
+brand="SHIRO"
+uri="https://github.com/ninodewit/SHIRO-Plugins/plugins/larynx"
+category="['Modulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Modulay"
+brand="SHIRO"
+uri="https://github.com/ninodewit/SHIRO-Plugins/plugins/modulay"
+category="['Delay']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Shiroverb"
+brand="SHIRO"
+uri="https://github.com/ninodewit/SHIRO-Plugins/plugins/shiroverb"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Wolf Shaper"
+brand="Wolf Plugins"
+uri="https://github.com/pdesaulniers/wolf-shaper"
+category="['Distortion', 'Waveshaper']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Cabinet Loader"
+brand="MOD"
+uri="https://mod.audio/plugins/CabinetLoader"
+category="['Simulator']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Convolution Loader"
+brand="MOD"
+uri="https://mod.audio/plugins/ConvolutionLoader"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Neural Record"
+brand="brummer"
+uri="urn:brummer10:neuralrecord"
+category="['Utility']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="DIE Fluid Synth"
+brand="DISTRHO"
+uri="urn:distrho:a-fluidsynth"
+category="['Generator', 'Instrument']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Dragonfly Early Reflections"
+brand="Dragonfly"
+uri="urn:dragonfly:early"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Dragonfly Plate Reverb"
+brand="Dragonfly"
+uri="urn:dragonfly:plate"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="Dragonfly Room Reverb"
+brand="Dragonfly"
+uri="urn:dragonfly:room"
+category="['Reverb']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="ZamComp"
+brand="ZamAudio"
+uri="urn:zamaudio:ZamComp"
+category="['Dynamics', 'Compressor']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
+[[plugin]]
+name="ZamCompX2"
+brand="ZamAudio"
+uri="urn:zamaudio:ZamCompX2"
+category="['Dynamics', 'Compressor']"
+# disable_ports = []
+# join_audio_inputs = true
+# join_audio_outputs = false
+
