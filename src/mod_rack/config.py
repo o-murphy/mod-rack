@@ -21,7 +21,7 @@ __all__ = [
 class PluginConfig:
     name: str
     uri: str
-    category: str = ""
+    category: list[str] = field(default_factory=list)
     # Опціональні override для портів (для моно/стерео конверсії)
     disable_ports: list[str] = field(default_factory=list)
     # Явний режим каналів: "mono", "stereo", або None (авто)
@@ -140,4 +140,9 @@ class Config:
 
     def list_categories(self) -> list[str]:
         """Отримати список всіх категорій"""
-        return sorted(set(p.category for p in self.plugins if p.category))
+        categories = set()
+        for p in self.plugins:
+            for category in p.category:
+                if category not in categories:
+                    categories.add(category) 
+        return sorted(categories)
