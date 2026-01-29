@@ -66,7 +66,15 @@ class RackClient:
             key = b"dGhlIHNhbXBsZSBub25jZQ=="
             host_bytes = self.host.encode() if isinstance(self.host, str) else self.host
             port_bytes = str(self.port).encode()
-            request = b"GET / HTTP/1.1\r\nHost: " + host_bytes + b":" + port_bytes + b"\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: " + key + b"\r\nSec-WebSocket-Version: 13\r\n\r\n"
+            request = (
+                b"GET / HTTP/1.1\r\nHost: "
+                + host_bytes
+                + b":"
+                + port_bytes
+                + b"\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: "
+                + key
+                + b"\r\nSec-WebSocket-Version: 13\r\n\r\n"
+            )
             self._sock.send(request)
 
             # Read response
@@ -91,7 +99,8 @@ class RackClient:
         if self._sock:
             try:
                 self._sock.close()
-            except:
+            except Exception as e:
+                print(e)
                 pass
         self._connected = False
         self._sock = None
@@ -187,7 +196,9 @@ class RackClient:
         """Set a plugin parameter (only INPUT controls). Fire and forget."""
         if not self._connected:
             return
-        self._send({"cmd": "set_param", "label": label, "symbol": symbol, "value": value})
+        self._send(
+            {"cmd": "set_param", "label": label, "symbol": symbol, "value": value}
+        )
 
     def set_bypass(self, label, bypassed):
         """Set plugin bypass state. Fire and forget."""
@@ -269,7 +280,8 @@ class RackClient:
                     if self.on_bypass_change:
                         self.on_bypass_change(label, bypassed)
                     return True
-            except:
+            except Exception as e:
+                print("Error", e)
                 pass
 
         return False

@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator
 
-from mod_rack.client import GraphOutputSetEvent, GraphParamSetBypassEvent, Client, GraphParamSetEvent
+from mod_rack.client import (
+    GraphOutputSetEvent,
+    GraphParamSetBypassEvent,
+    Client,
+    GraphParamSetEvent,
+)
 from mod_rack.config import Config, PluginConfig
 from mod_rack.controls import ControlPort, parse_control_ports
 

@@ -16,7 +16,11 @@ from typing import TYPE_CHECKING
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from mod_rack.client import GraphOutputSetEvent, GraphParamSetEvent, GraphParamSetBypassEvent
+from mod_rack.client import (
+    GraphOutputSetEvent,
+    GraphParamSetEvent,
+    GraphParamSetBypassEvent,
+)
 from mod_rack.controls import ControlPort
 
 if TYPE_CHECKING:
@@ -32,9 +36,13 @@ def _serialize_control(ctrl: ControlPort) -> dict:
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
         "default": ctrl.default,
-        "scale_points": [{"value": sp.value, "label": sp.label} for sp in ctrl.scale_points],
+        "scale_points": [
+            {"value": sp.value, "label": sp.label} for sp in ctrl.scale_points
+        ],
         "properties": ctrl.properties.name if ctrl.properties else "NONE",
-        "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label} if ctrl.units else None,
+        "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label}
+        if ctrl.units
+        else None,
         "range_steps": ctrl.range_steps,
         "value": ctrl.value,
     }
@@ -45,7 +53,9 @@ def _serialize_slot(slot: "PluginSlot") -> dict:
     return {
         "label": slot.label,
         "bypassed": slot.plugin.bypassed,
-        "controls": [_serialize_control(ctrl) for ctrl in slot.plugin.controls.values()],
+        "controls": [
+            _serialize_control(ctrl) for ctrl in slot.plugin.controls.values()
+        ],
     }
 
 
@@ -61,7 +71,9 @@ class RackWSServer:
             {"event": "order", "slots": [{label, controls: [...]}]}
     """
 
-    def __init__(self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000):
+    def __init__(
+        self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000
+    ):
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
@@ -106,17 +118,16 @@ class RackWSServer:
         print("[WS] param_set done")
 
         # Manually broadcast since MOD doesn't echo back our own changes
-        message = json.dumps({
-            "event": "param",
-            "label": label,
-            "symbol": symbol,
-            "value": value,
-        })
+        message = json.dumps(
+            {
+                "event": "param",
+                "label": label,
+                "symbol": symbol,
+                "value": value,
+            }
+        )
         if self._loop and self._clients:
-            asyncio.run_coroutine_threadsafe(
-                self._broadcast(message),
-                self._loop
-            )
+            asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
 
     def _set_bypass(self, label: str, bypassed: bool) -> None:
         """Set plugin bypass state."""
@@ -130,40 +141,37 @@ class RackWSServer:
         message = json.dumps({"event": "order", "slots": slots_data})
 
         if self._loop and self._clients:
-            asyncio.run_coroutine_threadsafe(
-                self._broadcast(message),
-                self._loop
-            )
+            asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
 
-    def _on_control_changed(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
+    def _on_control_changed(
+        self, event: GraphParamSetEvent | GraphOutputSetEvent
+    ) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
         print(f"[WS] param changed: {event.label}/{event.symbol} = {event.value}")
-        message = json.dumps({
-            "event": "param",
-            "label": event.label,
-            "symbol": event.symbol,
-            "value": event.value,
-        })
+        message = json.dumps(
+            {
+                "event": "param",
+                "label": event.label,
+                "symbol": event.symbol,
+                "value": event.value,
+            }
+        )
 
         if self._loop and self._clients:
-            asyncio.run_coroutine_threadsafe(
-                self._broadcast(message),
-                self._loop
-            )
+            asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
 
     def _on_bypass_changed(self, event: GraphParamSetBypassEvent) -> None:
         """Called when a plugin bypass state changes - broadcast to all clients."""
-        message = json.dumps({
-            "event": "bypass",
-            "label": event.label,
-            "bypassed": event.bypassed,
-        })
+        message = json.dumps(
+            {
+                "event": "bypass",
+                "label": event.label,
+                "bypassed": event.bypassed,
+            }
+        )
 
         if self._loop and self._clients:
-            asyncio.run_coroutine_threadsafe(
-                self._broadcast(message),
-                self._loop
-            )
+            asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
 
     async def _broadcast(self, message: str) -> None:
         """Send message to all connected clients."""
@@ -196,7 +204,9 @@ class RackWSServer:
 
                     if cmd == "get_order":
                         slots_data = self._get_order_data()
-                        await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
+                        await websocket.send(
+                            json.dumps({"event": "order", "slots": slots_data})
+                        )
 
                     elif cmd == "set_param":
                         label = msg.get("label")
@@ -210,7 +220,9 @@ class RackWSServer:
                         self._set_bypass(label, bypassed)
 
                     else:
-                        await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
+                        await websocket.send(
+                            json.dumps({"error": f"unknown cmd: {cmd}"})
+                        )
 
                 except json.JSONDecodeError:
                     await websocket.send(json.dumps({"error": "invalid json"}))
@@ -229,6 +241,7 @@ class RackWSServer:
 
     def start(self) -> None:
         """Start server in a background thread."""
+
         def run():
             self._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._loop)

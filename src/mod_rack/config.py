@@ -145,5 +145,5 @@ class Config:
         for p in self.plugins:
             for category in p.category:
                 if category not in categories:
-                    categories.add(category) 
+                    categories.add(category)
         return sorted(categories)
