@@ -13,7 +13,7 @@ url = "http://127.0.0.1:18181"
 # join_audio_outputs = true
 
 [rack]
-routing_mode = "patchbay"  # one of [hard_bypass, linear, dual_track, "patchbay"], default=hard_bypass
+routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track, "patchbay"], default=hard_bypass
 
 
 ###################
