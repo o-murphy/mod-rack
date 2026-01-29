@@ -1,12 +1,14 @@
 import argparse
 from pathlib import Path
-from pprint import pprint
 from mod_rack.client import Client
 
 try:
     import tomllib
 except ImportError:
     import tomli as tomllib
+
+base_path = Path(__file__).parent
+
 
 header_fmt = """###########################
 # --- MOD RACK CONFIG --- #
@@ -33,13 +35,13 @@ routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track], defaul
 """
 
 plugin_fmt = """[[plugins]]
-name="{name}"
-brand="{brand}"
-uri="{uri}"
-category="{category}"
-# disable_ports = []
-# join_audio_inputs = false
-# join_audio_outputs = false
+name = "{name}"
+brand = "{brand}"
+uri = "{uri}"
+category = {category}
+disable_ports = {disable_ports}
+join_audio_inputs = {join_audio_inputs}
+join_audio_outputs = {join_audio_outputs}
 
 """
 
@@ -51,14 +53,27 @@ class Args(argparse.Namespace):
     allow_all: bool
 
 
-def _is_supported(plugin_data):
-    # TODO
-    return True
+class _KnownPlugins:
+    PATH = base_path / "plugins.toml"
 
+    def __init__(self):
+        with open(self.PATH, "rb") as fp:
+            data = tomllib.load(fp)
+            self.known: dict[str, dict] = {
+                item["uri"]: item for item in data["plugins"]
+            }
 
-def _apply_fix(plugin_data):
-    # TODO
-    return plugin_data
+    def is_supported(self, plugin_info: dict):
+        if plugin_info["uri"] in self.known:
+            return True
+        return False
+
+    def apply_fix(self, plugin_info: dict):
+        if plugin_info["uri"] in self.known:
+            plugin_info.update(self.known[plugin_info["uri"]])
+            plugin_info["join_audio_inputs"] = str(plugin_info["join_audio_inputs"]).lower() 
+            plugin_info["join_audio_outputs"] = str(plugin_info["join_audio_outputs"]).lower() 
+        return plugin_info
 
 
 def main():
@@ -87,31 +102,38 @@ def main():
     )
 
     try:
+        known = _KnownPlugins()
+
         ns: Args = parser.parse_args()
         client = Client(ns.server)
 
         plugins_list = client.effect_list()
 
-        pprint(len(plugins_list))
+        print("Fetched:", len(plugins_list))
+
+        parts = []
+        parts.append(header_fmt.format(url=client.base_url))
 
         plugins = []
 
-        plugins.append(header_fmt.format(url=client.base_url))
-
         for plugin in plugins_list:
-            if not ns.allow_all and not _is_supported(plugin):
+            info_dict = {
+                "uri": plugin["uri"],
+                "name": plugin["name"],
+                "brand": plugin["brand"],
+                "category": plugin["category"],
+                "disable_ports": [],
+                "join_audio_inputs": "false",
+                "join_audio_outputs": "false",
+            }
+
+            if not ns.allow_all and not known.is_supported(info_dict):
                 continue
 
             if not ns.no_fix:
-                plugin = _apply_fix(plugin)
-
-            info = plugin_fmt.format(
-                uri=plugin["uri"],
-                name=plugin["name"],
-                brand=plugin["brand"],
-                category=plugin["category"],
-            )
-
+                info_dict = known.apply_fix(info_dict)
+            print(info_dict)
+            info = plugin_fmt.format(**info_dict).replace("'", '"')
             plugins.append(info)
 
         if ns.output.exists():
@@ -122,14 +144,18 @@ def main():
         else:
             out = ns.output
 
+        parts.extend(plugins)
+
+        print("Parsed:", len(plugins))
         out = out.with_suffix(".toml")
         with open(out, "w") as fp:
-            fp.writelines(plugins)
+            fp.writelines(parts)
 
         parser.exit(0, f"Config saved to '{out}'\n")
 
     except Exception as err:
-        parser.error(str(err))
+        # parser.error(str(err))
+        raise
 
     parser.exit(0)
 
