@@ -3,6 +3,11 @@ from pathlib import Path
 from pprint import pprint
 from mod_rack.client import Client
 
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
 header_fmt = """###########################
 # --- MOD RACK CONFIG --- #
 ###########################
@@ -42,6 +47,18 @@ category="{category}"
 class Args(argparse.Namespace):
     server: str
     output: Path
+    no_fix: bool
+    allow_all: bool
+
+
+def _is_supported(plugin_data):
+    # TODO
+    return True
+
+
+def _apply_fix(plugin_data):
+    # TODO
+    return plugin_data
 
 
 def main():
@@ -58,25 +75,41 @@ def main():
         action="store",
         default="config.toml",
     )
+    parser.add_argument(
+        "--no-fix",
+        help="Do not apply known fixes",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--allow-all",
+        help="Allow untested or unsupported plugins",
+        action="store_true",
+    )
 
     try:
         ns: Args = parser.parse_args()
         client = Client(ns.server)
 
-        data = client.effect_list()
+        plugins_list = client.effect_list()
 
-        pprint(len(data))
+        pprint(len(plugins_list))
 
         plugins = []
 
         plugins.append(header_fmt.format(url=client.base_url))
 
-        for item in data:
+        for plugin in plugins_list:
+            if not ns.allow_all and not _is_supported(plugin):
+                continue
+
+            if not ns.no_fix:
+                plugin = _apply_fix(plugin)
+
             info = plugin_fmt.format(
-                uri=item["uri"],
-                name=item["name"],
-                brand=item["brand"],
-                category=item["category"],
+                uri=plugin["uri"],
+                name=plugin["name"],
+                brand=plugin["brand"],
+                category=plugin["category"],
             )
 
             plugins.append(info)
