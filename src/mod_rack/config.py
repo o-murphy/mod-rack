@@ -44,7 +44,8 @@ class RoutingMode(Enum):
     LINEAR = "linear"  # Суворий 1->2->3 (з ризиком розривів)
     # Кожен вихід шукає найближчий наступний вхід (паралелізм)
     HARD_BYPASS = "hard_bypass"
-    DUAL_TRACK = "dual_track"  # Незалежні аудіо та міді ланцюги (твій новий режим)
+    DUAL_TRACK = "dual_track"  # Незалежні аудіо та міді ланцюги
+    PATCHBAY = "patchbay"  # Вимкнути авто-роутинг повністю
 
 
 @dataclass
