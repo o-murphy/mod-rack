@@ -136,8 +136,7 @@ class Config:
 
     def get_plugins_by_category(self, category: str) -> list[PluginConfig]:
         """Отримати всі плагіни певної категорії"""
-        category_lower = category.lower()
-        return [p for p in self.plugins if p.category.lower() == category_lower]
+        return [p for p in self.plugins if category in p.category]
 
     def list_categories(self) -> list[str]:
         """Отримати список всіх категорій"""
