@@ -1,6 +1,7 @@
 from .config import Config, HardwareConfig, PluginConfig, RackConfig
 from .client import (
     DEFAULT_SERVER_URL,
+    DEFAULT_DEBOUNCE_DELAY,
     Client,
     WsClient,
     WsConnection,
@@ -51,6 +52,7 @@ __all__ = [
     "Config",
     # Client
     "DEFAULT_SERVER_URL",
+    "DEFAULT_DEBOUNCE_DELAY",
     "Client",
     "WsConnection",
     "WsProtocol",
