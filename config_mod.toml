@@ -14,7 +14,6 @@ url = "http://127.0.0.1:18181/"
 
 [rack]
 routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
-allow_all_plugins = true
 
 # =============================================================================
 # Plugins

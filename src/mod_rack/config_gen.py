@@ -24,7 +24,7 @@ url = "{url}"
 
 [rack]
 routing_mode = "hard_bypass"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
-allow_all_plugins = true
+
 
 ###############################
 # --- MOD Desktop Plugins --- #
@@ -32,13 +32,13 @@ allow_all_plugins = true
 
 """
 
-plugin_fmt = """[[plugin]]
+plugin_fmt = """[[plugins]]
 name="{name}"
 brand="{brand}"
 uri="{uri}"
 category="{category}"
 # disable_ports = []
-# join_audio_inputs = true
+# join_audio_inputs = false
 # join_audio_outputs = false
 
 """
