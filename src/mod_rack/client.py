@@ -91,7 +91,7 @@ class SysStatsEvent:
 
 @dataclass(frozen=True)
 class DataReadyEvent:
-    value: int
+    value: int = field(compare=False)
 
 
 @dataclass(frozen=True)
