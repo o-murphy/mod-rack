@@ -426,15 +426,17 @@ class RoutingManager:
         cls,
         inputs: list[str],
         outputs: list[str],
-        joid_inputs: bool,
-        joid_outputs: bool,
+        join_inputs: bool,
+        join_outputs: bool,
     ):
         if not outputs or not inputs:
             return []
 
         connections = []
 
-        if joid_inputs or joid_outputs:
+        print("JOIN", outputs, join_outputs)
+
+        if join_inputs or join_outputs:
             # All-to-all: кожен вихід з кожним входом
             for out in outputs:
                 for inp in inputs:
@@ -817,19 +819,13 @@ class Orchestrator:
         slot = self.get_slot_by_label(event.label)
         if not slot:
             # Just update position
-            if self.config.rack.allow_all_plugins:
-                plugin = Plugin(
-                    self.client,
-                    uri=event.uri,
-                    label=event.label,
-                )
-            else:
-                plugin = Plugin.load_supported(
-                    self.client,
-                    uri=event.uri,
-                    label=event.label,
-                    config=self.config,
-                )
+
+            plugin = Plugin.load_supported(
+                self.client,
+                uri=event.uri,
+                label=event.label,
+                config=self.config,
+            )
 
             if not plugin:
                 _Color.red(f"Can not load plugin: {event.label}, {event.uri}")
