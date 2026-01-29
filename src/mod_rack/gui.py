@@ -265,7 +265,7 @@ class PluginSelectorDialog(QDialog):
             uri = p_config.uri
             category = p_config.category or "General"
 
-            item = QListWidgetItem(f"{name}\n  [{category}]")
+            item = QListWidgetItem(f"{name}\n  [{', '.join(category)}]")
             item.setData(Qt.ItemDataRole.UserRole, uri)
             self.list_widget.addItem(item)
 
