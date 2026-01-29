@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from mod_rack.client import GraphParamSetEvent, GraphParamSetBypassEvent
+from mod_rack.client import GraphOutputSetEvent, GraphParamSetEvent, GraphParamSetBypassEvent
 from mod_rack.controls import ControlPort
 
 if TYPE_CHECKING:
@@ -75,6 +75,7 @@ class RackWSServer:
         # Register for param changes
         orchestrator.client.ws.on(GraphParamSetEvent, self._on_param_changed)
         orchestrator.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
+        orchestrator.client.ws.on(GraphOutputSetEvent, self._on_output_changed)
 
     def _get_order_data(self) -> list[dict]:
         """Get current order as list of slot data with controls."""
@@ -92,6 +93,21 @@ class RackWSServer:
             )
 
     def _on_param_changed(self, event: GraphParamSetEvent) -> None:
+        """Called when a plugin parameter changes - broadcast to all clients."""
+        message = json.dumps({
+            "event": "param",
+            "label": event.label,
+            "symbol": event.symbol,
+            "value": event.value,
+        })
+
+        if self._loop and self._clients:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast(message),
+                self._loop
+            )
+
+    def _on_output_changed(self, event: GraphParamSetEvent) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
         message = json.dumps({
             "event": "param",

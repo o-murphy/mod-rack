@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator
 
-from mod_rack.client import GraphParamSetBypassEvent, Client, GraphParamSetEvent
+from mod_rack.client import GraphOutputSetEvent, GraphParamSetBypassEvent, Client, GraphParamSetEvent
 from mod_rack.config import Config, PluginConfig
 from mod_rack.controls import ControlPort, parse_control_ports
 
@@ -80,12 +80,17 @@ class Plugin:
     def _subscribe(self):
         self.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_change)
         self.client.ws.on(GraphParamSetEvent, self._on_param_change)
+        self.client.ws.on(GraphOutputSetEvent, self._on_output_change)
 
     def _on_bypass_change(self, event: GraphParamSetBypassEvent):
         if self.label == event.label:
             self._bypassed = event.bypassed
 
     def _on_param_change(self, event: GraphParamSetEvent):
+        if self.label == event.label and event.symbol in self.controls:
+            self.set_cached_value(event.symbol, event.value)
+
+    def _on_output_change(self, event: GraphOutputSetEvent):
         if self.label == event.label and event.symbol in self.controls:
             self.set_cached_value(event.symbol, event.value)
 
