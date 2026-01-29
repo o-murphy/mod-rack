@@ -85,19 +85,38 @@ class RackWSServer:
         """Set a plugin parameter. Only works for INPUT controls."""
         from mod_rack.client import PortDirection
 
+        print(f"[WS] _set_param: {label}/{symbol} = {value}")
+
         slot = self.orchestrator.get_slot_by_label(label)
         if not slot:
+            print(f"[WS] slot not found: {label}")
             return
 
         plugin = slot.plugin
         if symbol not in plugin.controls:
+            print(f"[WS] symbol not found: {symbol}")
             return
 
         control = plugin.controls[symbol]
         if control.direction != PortDirection.INPUT:
+            print(f"[WS] not INPUT: {symbol}")
             return
 
         plugin.param_set(symbol, value)
+        print("[WS] param_set done")
+
+        # Manually broadcast since MOD doesn't echo back our own changes
+        message = json.dumps({
+            "event": "param",
+            "label": label,
+            "symbol": symbol,
+            "value": value,
+        })
+        if self._loop and self._clients:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast(message),
+                self._loop
+            )
 
     def _set_bypass(self, label: str, bypassed: bool) -> None:
         """Set plugin bypass state."""
@@ -118,6 +137,7 @@ class RackWSServer:
 
     def _on_param_changed(self, event: GraphParamSetEvent) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
+        print(f"[WS] param changed: {event.label}/{event.symbol} = {event.value}")
         message = json.dumps({
             "event": "param",
             "label": event.label,

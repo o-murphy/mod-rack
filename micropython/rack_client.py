@@ -127,47 +127,41 @@ class RackClient:
         self._sock.send(bytes(frame))
 
     def _recv_frame(self):
-        """Receive WebSocket frame."""
-        try:
-            # Read first 2 bytes
-            header = self._sock.recv(2)
-            if not header or len(header) < 2:
-                self.disconnect()
-                return None
-
-            opcode = header[0] & 0x0F
-            length = header[1] & 0x7F
-
-            # Handle extended length
-            if length == 126:
-                ext = self._sock.recv(2)
-                length = (ext[0] << 8) | ext[1]
-            elif length == 127:
-                ext = self._sock.recv(8)
-                length = int.from_bytes(ext, "big")
-
-            # Server frames are not masked
-            payload = b""
-            while len(payload) < length:
-                chunk = self._sock.recv(length - len(payload))
-                if not chunk:
-                    self.disconnect()
-                    return None
-                payload += chunk
-
-            if opcode == 0x08:  # Close frame
-                self._connected = False
-                return None
-
-            if opcode == 0x01:  # Text frame
-                return payload.decode()
-
-            return None
-
-        except Exception as e:
-            print("Recv error:", e)
+        """Receive WebSocket frame. Raises OSError on timeout/EAGAIN."""
+        # Read first 2 bytes (may raise OSError EAGAIN in non-blocking mode)
+        header = self._sock.recv(2)
+        if not header or len(header) < 2:
             self.disconnect()
             return None
+
+        opcode = header[0] & 0x0F
+        length = header[1] & 0x7F
+
+        # Handle extended length
+        if length == 126:
+            ext = self._sock.recv(2)
+            length = (ext[0] << 8) | ext[1]
+        elif length == 127:
+            ext = self._sock.recv(8)
+            length = int.from_bytes(ext, "big")
+
+        # Server frames are not masked
+        payload = b""
+        while len(payload) < length:
+            chunk = self._sock.recv(length - len(payload))
+            if not chunk:
+                self.disconnect()
+                return None
+            payload += chunk
+
+        if opcode == 0x08:  # Close frame
+            self._connected = False
+            return None
+
+        if opcode == 0x01:  # Text frame
+            return payload.decode()
+
+        return None
 
     def _send(self, msg):
         """Send JSON message."""
@@ -229,16 +223,25 @@ class RackClient:
                 return True
         return False
 
-    def poll(self):
+    def poll(self, timeout=0):
         """
-        Check for incoming messages (non-blocking if socket is non-blocking).
+        Check for incoming messages (non-blocking by default).
 
         Returns True if a message was received.
         """
-        if not self._connected:
+        if not self._connected or not self._sock:
             return False
 
-        response = self._recv_frame()
+        # Set timeout for non-blocking read
+        self._sock.settimeout(timeout)
+        try:
+            response = self._recv_frame()
+        except OSError:
+            # No data available (timeout)
+            return False
+        finally:
+            # Restore blocking mode for other operations
+            self._sock.settimeout(None)
         if response:
             try:
                 data = json.loads(response)
@@ -374,7 +377,10 @@ if __name__ == "__main__":
             client.set_param(test_label, test_symbol, new_value)
             test_value = new_value
 
-            time.sleep(1)
+            # Poll for responses
+            time.sleep(0.1)
+            client.poll()
+            time.sleep(0.1)
 
     except KeyboardInterrupt:
         print("Stopping...")
