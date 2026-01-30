@@ -66,11 +66,11 @@ class Plugin:
         self.cv_outputs: list[Port] = []
 
         # configuration
-        self.join_audio_inputs: bool = (
-            config.join_audio_inputs if config is not None else False
+        self.join_inputs: bool = (
+            config.join_inputs if config is not None else False
         )
-        self.join_audio_outputs: bool = (
-            config.join_audio_outputs if config is not None else False
+        self.join_outputs: bool = (
+            config.join_outputs if config is not None else False
         )
 
         self._effect_data: dict = self.client.effect_get(self.uri)

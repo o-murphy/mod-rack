@@ -103,12 +103,12 @@ class PluginSlot:
         return [p.graph_path for p in self.plugin.cv_outputs]
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.plugin.join_audio_outputs
+    def join_outputs(self) -> bool:
+        return self.plugin.join_outputs
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return self.plugin.join_audio_inputs
+    def join_inputs(self) -> bool:
+        return self.plugin.join_inputs
 
     @property
     def size(self) -> tuple[int, int]:
@@ -156,10 +156,10 @@ class HardwareSlot:
 
         # Налаштування з конфігу
         if direction == PortDirection.INPUT:
-            self.join_audio_ports = config.join_audio_inputs
+            self.join_ports = config.join_inputs
             self.label = "hw_in"
         else:
-            self.join_audio_ports = config.join_audio_outputs
+            self.join_ports = config.join_outputs
             self.label = "hw_out"
 
     @property
@@ -195,12 +195,12 @@ class HardwareSlot:
         return self.midi_ports if self.direction == PortDirection.INPUT else []
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return False if self.direction == PortDirection.INPUT else self.join_audio_ports
+    def join_inputs(self) -> bool:
+        return False if self.direction == PortDirection.INPUT else self.join_ports
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.join_audio_ports if self.direction == PortDirection.INPUT else False
+    def join_outputs(self) -> bool:
+        return self.join_ports if self.direction == PortDirection.INPUT else False
 
     def __repr__(self):
         return (
@@ -504,8 +504,8 @@ class RoutingManager:
         inputs = dst.audio_inputs
 
         # Визначаємо прапори об'єднання (join)
-        join_outputs = src.join_audio_outputs
-        join_inputs = dst.join_audio_inputs
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
@@ -517,8 +517,8 @@ class RoutingManager:
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
         # Визначаємо прапори об'єднання (join)
-        join_outputs = True  # src.join_midi_outputs
-        join_inputs = True  # dst.join_midi_inputs
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
@@ -531,8 +531,8 @@ class RoutingManager:
         inputs = dst.cv_inputs
 
         # Визначаємо прапори об'єднання (join)
-        join_outputs = True
-        join_inputs = True
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
