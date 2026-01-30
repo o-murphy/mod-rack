@@ -517,25 +517,53 @@ class ControlsPanel(QScrollArea):
         self._layout.addWidget(line)
 
         # Controls grid
-        controls_group = QGroupBox("Controls")
-        grid = QGridLayout(controls_group)
+        # ================================
+        # OUTPUTS (top)
+        # ================================
+        outputs_group = QGroupBox("Outputs")
+        outputs_grid = QGridLayout(outputs_group)
 
-        row, col = 0, 0
+        out_row = out_col = 0
         max_cols = 3
 
-        for symbol in plugin:
-            control = plugin[symbol]
+        # ================================
+        # INPUTS (bottom)
+        # ================================
+        inputs_group = QGroupBox("Controls")
+        inputs_grid = QGridLayout(inputs_group)
+
+        in_row = in_col = 0
+
+        controls = sorted(
+            (plugin[symbol] for symbol in plugin),
+            key=lambda c: c.index
+        )
+
+        for control in controls:
             widget = create_control_widget(control)
             widget.value_changed.connect(self._on_control_changed)
-            self.control_widgets[symbol] = widget
+            self.control_widgets[control.symbol] = widget
 
-            grid.addWidget(widget, row, col)
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
+            if control.direction == PortDirection.OUTPUT:
+                outputs_grid.addWidget(widget, out_row, out_col)
+                out_col += 1
+                if out_col >= max_cols:
+                    out_col = 0
+                    out_row += 1
+            else:
+                inputs_grid.addWidget(widget, in_row, in_col)
+                in_col += 1
+                if in_col >= max_cols:
+                    in_col = 0
+                    in_row += 1
 
-        self._layout.addWidget(controls_group)
+        # Додаємо фрейми у правильному порядку
+        if out_row or out_col:
+            self._layout.addWidget(outputs_group)
+
+        if in_row or in_col:
+            self._layout.addWidget(inputs_group)
+
         self._layout.addStretch()
 
     def _clear_controls(self):

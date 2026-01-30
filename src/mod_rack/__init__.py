@@ -7,6 +7,7 @@ from .client import (
     WsConnection,
     PortDirection,
     PortType,
+    Port,
     WsEvent,
     WsProtocol,
     GraphAddHwPortEvent,
@@ -35,7 +36,7 @@ from .rack import (
     Rack,
     RoutingManager,
 )
-from .plugin import Plugin, Port
+from .plugin import Plugin
 from .controls import (
     ControlPort,
     ControlProperties,

@@ -14,22 +14,16 @@ from mod_rack.client import (
     GraphOutputSetEvent,
     GraphParamSetBypassEvent,
     Client,
+    Port,
     GraphParamSetEvent,
+    PortDirection,
+    PortType,
 )
 from mod_rack.config import Config, PluginConfig
 from mod_rack.controls import ControlPort, parse_control_ports
 
 
-__all__ = ["Port", "Plugin"]
-
-
-@dataclass(frozen=True, slots=True)
-class Port:
-    """Audio/CV/MIDI port on a plugin."""
-
-    symbol: str
-    name: str
-    graph_path: str
+__all__ = ["Plugin"]
 
 
 class Plugin:
@@ -120,7 +114,7 @@ class Plugin:
             uri=uri,
             label=label,
             config=plugin_config,
-            filter_gui_controls=config.rack.filter_gui_controls
+            filter_gui_controls=config.rack.filter_gui_controls,
         )
         return plugin
 
@@ -151,6 +145,8 @@ class Plugin:
                     symbol=p["symbol"],
                     name=p.get("name", p["symbol"]),
                     graph_path=f"{label}/{p['symbol']}",
+                    port_type=PortType.AUDIO,
+                    direction=PortDirection.INPUT,
                 )
             )
         for p in audio_ports.get("output", []):
@@ -161,6 +157,8 @@ class Plugin:
                     symbol=p["symbol"],
                     name=p.get("name", p["symbol"]),
                     graph_path=f"{label}/{p['symbol']}",
+                    port_type=PortType.AUDIO,
+                    direction=PortDirection.INPUT,
                 )
             )
         for p in midi_ports.get("input", []):
@@ -171,6 +169,8 @@ class Plugin:
                     symbol=p["symbol"],
                     name=p.get("name", p["symbol"]),
                     graph_path=f"{label}/{p['symbol']}",
+                    port_type=PortType.MIDI,
+                    direction=PortDirection.INPUT,
                 )
             )
         for p in midi_ports.get("output", []):
@@ -181,6 +181,8 @@ class Plugin:
                     symbol=p["symbol"],
                     name=p.get("name", p["symbol"]),
                     graph_path=f"{label}/{p['symbol']}",
+                    port_type=PortType.MIDI,
+                    direction=PortDirection.OUTPUT,
                 )
             )
 
@@ -194,7 +196,7 @@ class Plugin:
     def _load_controls(self, filter_gui_controls: bool = False) -> None:
         """Load control metadata from effect_get response."""
         controls = parse_control_ports(
-            self._effect_data, filter_gui_controls=filter_gui_controls
+            self.label, self._effect_data, filter_gui_controls=filter_gui_controls
         )
         self._controls = {c.symbol: c for c in controls}
 

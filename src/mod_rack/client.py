@@ -22,6 +22,7 @@ __all__ = [
     # Client:Port
     "PortType",
     "PortDirection",
+    "Port",
     # Client:Generic
     "WsEvent",
     "EventCallBack",
@@ -140,11 +141,25 @@ class PbSizeEvent:
 class PortType(Enum):
     AUDIO = "audio"
     MIDI = "midi"
+    CV = "cv"
+    CONTROL = "control"
 
 
 class PortDirection(Enum):
     INPUT = "0"
     OUTPUT = "1"
+
+
+@dataclass(slots=True)
+class Port:
+    """Audio/CV/MIDI/CONTROL port on a plugin."""
+
+     # Identity
+    symbol: str  # LV2 symbol, used in API calls
+    name: str  # Display name
+    graph_path: str
+    port_type: PortType
+    direction: PortDirection
 
 
 @dataclass(frozen=True)
