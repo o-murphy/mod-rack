@@ -473,6 +473,15 @@ class RoutingManager:
     ):
         if not outputs or not inputs:
             return []
+        
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        # --- AUTO JOIN RULE ---
+        # If parity mismatches (odd ↔ even), force join
+        if (n_out % 2) != (n_in % 2):
+            join_inputs = True
+            join_outputs = True
 
         connections = []
 
