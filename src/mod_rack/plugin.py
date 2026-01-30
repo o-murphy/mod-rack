@@ -7,29 +7,22 @@ dict-like access to control parameters with automatic API synchronization.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterator
+from typing import Any, Iterator
 
 from mod_rack.client import (
     GraphOutputSetEvent,
     GraphParamSetBypassEvent,
     Client,
+    Port,
     GraphParamSetEvent,
+    PortDirection,
+    PortType,
 )
 from mod_rack.config import Config, PluginConfig
 from mod_rack.controls import ControlPort, parse_control_ports
 
 
-__all__ = ["Port", "Plugin"]
-
-
-@dataclass(frozen=True, slots=True)
-class Port:
-    """Audio/CV/MIDI port on a plugin."""
-
-    symbol: str
-    name: str
-    graph_path: str
+__all__ = ["Plugin"]
 
 
 class Plugin:
@@ -69,6 +62,8 @@ class Plugin:
         self.audio_outputs: list[Port] = []
         self.midi_inputs: list[Port] = []
         self.midi_outputs: list[Port] = []
+        self.cv_inputs: list[Port] = []
+        self.cv_outputs: list[Port] = []
 
         # configuration
         self.join_audio_inputs: bool = (
@@ -84,8 +79,7 @@ class Plugin:
         self.size: tuple[int, int] = self.client.effect_image_size(
             self.uri, "screenshot.png"
         )
-        self._load_plugin_ports()
-        self._load_controls(filter_gui_controls)
+        self._load_plugin_ports(filter_gui_controls)
         self._subscribe()
 
     def _subscribe(self):
@@ -120,12 +114,13 @@ class Plugin:
             uri=uri,
             label=label,
             config=plugin_config,
-            filter_gui_controls=config.rack.filter_gui_controls
+            filter_gui_controls=config.rack.filter_gui_controls,
         )
         return plugin
 
-    def _load_plugin_ports(self) -> None:
+    def _load_plugin_ports(self, filter_gui_controls: bool = False) -> None:
         """Load and filter plugin ports from effect data.
+        Load control metadata from effect_get response.
 
         Args:
             label: Plugin label for graph paths
@@ -136,53 +131,43 @@ class Plugin:
         """
         # Parse all ports from effect data
 
-        ports: dict = self._effect_data.get("ports", {})
-        audio_ports: dict = ports.get("audio", {})
-        midi_ports: dict = ports.get("midi", {})
+        ports: dict[str, dict] = self._effect_data.get("ports", {})
 
         config = self._config
         label = self.label
 
-        for p in audio_ports.get("input", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.audio_inputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in audio_ports.get("output", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.audio_outputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in midi_ports.get("input", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.midi_inputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in midi_ports.get("output", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.midi_outputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
+        def _get_ports(port_type: str, direction: str):
+            try:
+                ports_: dict = ports[port_type]
+            except KeyError:
+                return []
+            
+            found = []
+            for p in ports_.get(direction, []):
+                if config is not None and p["symbol"] in config.disable_ports:
+                    continue
+                try:
+                    found.append(
+                        Port(
+                            symbol=p["symbol"],
+                            name=p.get("name", p["symbol"]),
+                            graph_path=f"{label}/{p['symbol']}",
+                            port_type=PortType(port_type),
+                            direction=PortDirection.INPUT
+                            if direction == "input"
+                            else PortDirection.OUTPUT,
+                        )
+                    )
+                except ValueError as err:
+                    print(f"Can't parse port_type or directio: {err}")
+            return found
+
+        self.audio_inputs = _get_ports("audio", "input")
+        self.audio_outputs = _get_ports("audio", "output")
+        self.midi_inputs = _get_ports("midi", "input")
+        self.midi_outputs = _get_ports("midi", "output")
+        self.cv_inputs = _get_ports("cv", "input")
+        self.cv_outputs = _get_ports("cv", "output")
 
         print(
             f"Parsed audio ports: inputs={self.audio_inputs}, outputs={self.audio_outputs}"
@@ -190,13 +175,14 @@ class Plugin:
         print(
             f"Parsed midi ports: inputs={self.midi_inputs}, outputs={self.midi_outputs}"
         )
+        print(f"Parsed cv ports: inputs={self.cv_inputs}, outputs={self.cv_inputs}")
 
-    def _load_controls(self, filter_gui_controls: bool = False) -> None:
-        """Load control metadata from effect_get response."""
         controls = parse_control_ports(
-            self._effect_data, filter_gui_controls=filter_gui_controls
+            self.label, self._effect_data, filter_gui_controls=filter_gui_controls
         )
         self._controls = {c.symbol: c for c in controls}
+
+        print(f"Parsed controls: {self._controls}")
 
     # --- Dict-like access to control values ---
 

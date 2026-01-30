@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Flag, auto
 from typing import Any
 
-from mod_rack.client import PortDirection
+from mod_rack.client import PortDirection, Port, PortType
 
 
 __all__ = [
@@ -93,7 +93,7 @@ class Units:
 
 
 @dataclass(slots=True)
-class ControlPort:
+class ControlPort(Port):
     """
     A plugin control port with full metadata.
 
@@ -104,14 +104,8 @@ class ControlPort:
     - Trigger: momentary button that resets to default
     """
 
-    # Identity
-    symbol: str  # LV2 symbol, used in API calls
-    name: str  # Display name
     short_name: str  # Abbreviated name
     index: int  # Port index in plugin
-
-    # Direction
-    direction: PortDirection
 
     # Value range
     minimum: float
@@ -252,7 +246,13 @@ class ControlPort:
         return formatted
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], direction: PortDirection) -> "ControlPort":
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        graph_path: str,
+        port_type: PortType,
+        direction: PortDirection,
+    ) -> "ControlPort":
         """Parse control port from API response."""
         ranges = data.get("ranges", {})
         units_data = data.get("units", {})
@@ -261,9 +261,11 @@ class ControlPort:
         return cls(
             symbol=data.get("symbol", ""),
             name=data.get("name", ""),
+            graph_path=graph_path,
+            port_type=port_type,
+            direction=direction,
             short_name=data.get("shortName", data.get("name", "")),
             index=data.get("index", 0),
-            direction=direction,
             minimum=float(ranges.get("minimum", 0.0)),
             maximum=float(ranges.get("maximum", 1.0)),
             default=float(ranges.get("default", 0.0)),
@@ -279,7 +281,7 @@ class ControlPort:
 
 
 def parse_control_ports(
-    effect_data: dict[str, Any], *, filter_gui_controls: bool = True
+    plugin_label: str, effect_data: dict[str, Any], *, filter_gui_controls: bool = True
 ) -> list[ControlPort]:
     """
     Parse all control input ports from effect_get response.
@@ -299,7 +301,7 @@ def parse_control_ports(
         return [
             control
             for control in controls_list
-            if "notOnGUI" not in control.get("properties")
+            if "notOnGUI" not in control.get("properties", [])
         ]
 
     if filter_gui_controls:
@@ -310,7 +312,12 @@ def parse_control_ports(
 
     controls.extend(
         [
-            ControlPort.from_dict(port_data, PortDirection.INPUT)
+            ControlPort.from_dict(
+                port_data,
+                graph_path=f"{plugin_label}/{port_data['symbol']}",
+                port_type=PortType.CONTROL,
+                direction=PortDirection.INPUT,
+            )
             for port_data in inputs
             if port_data.get("valid", True)
         ]
@@ -318,7 +325,12 @@ def parse_control_ports(
 
     controls.extend(
         [
-            ControlPort.from_dict(port_data, PortDirection.OUTPUT)
+            ControlPort.from_dict(
+                port_data,
+                graph_path=f"{plugin_label}/{port_data['symbol']}",
+                port_type=PortType.CONTROL,
+                direction=PortDirection.OUTPUT,
+            )
             for port_data in outputs
             if port_data.get("valid", True)
         ]

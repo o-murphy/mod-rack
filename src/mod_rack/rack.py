@@ -435,8 +435,6 @@ class RoutingManager:
 
         connections = []
 
-        print("JOIN", outputs, join_outputs)
-
         if join_inputs or join_outputs:
             # All-to-all: кожен вихід з кожним входом
             for out in outputs:

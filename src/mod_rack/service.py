@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import websockets
-from websockets.server import WebSocketServerProtocol
+from websockets.asyncio.server import ServerConnection
 
 from mod_rack.client import (
     GraphOutputSetEvent,
@@ -32,6 +32,7 @@ def _serialize_control(ctrl: ControlPort) -> dict:
     return {
         "symbol": ctrl.symbol,
         "name": ctrl.name,
+        "port_type": ctrl.port_type.name,
         "direction": ctrl.direction.name,
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
@@ -77,7 +78,7 @@ class RackWSServer:
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
-        self._clients: set[WebSocketServerProtocol] = set()
+        self._clients: set[ServerConnection] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server_task: asyncio.Task | None = None
 
@@ -97,25 +98,25 @@ class RackWSServer:
         """Set a plugin parameter. Only works for INPUT controls."""
         from mod_rack.client import PortDirection
 
-        print(f"[WS] _set_param: {label}/{symbol} = {value}")
+        print(f"[RACK WS] _set_param: {label}/{symbol} = {value}")
 
         slot = self.orchestrator.get_slot_by_label(label)
         if not slot:
-            print(f"[WS] slot not found: {label}")
+            print(f"[RACK WS] slot not found: {label}")
             return
 
         plugin = slot.plugin
         if symbol not in plugin.controls:
-            print(f"[WS] symbol not found: {symbol}")
+            print(f"[RACK WS] symbol not found: {symbol}")
             return
 
         control = plugin.controls[symbol]
         if control.direction != PortDirection.INPUT:
-            print(f"[WS] not INPUT: {symbol}")
+            print(f"[RACK WS] not INPUT: {symbol}")
             return
 
         plugin.param_set(symbol, value)
-        print("[WS] param_set done")
+        print("[RACK WS] param_set done")
 
         # Manually broadcast since MOD doesn't echo back our own changes
         message = json.dumps(
@@ -147,7 +148,7 @@ class RackWSServer:
         self, event: GraphParamSetEvent | GraphOutputSetEvent
     ) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
-        print(f"[WS] param changed: {event.label}/{event.symbol} = {event.value}")
+        print(f"[RACK WS] param changed: {event.label}/{event.symbol} = {event.value}")
         message = json.dumps(
             {
                 "event": "param",
@@ -187,10 +188,10 @@ class RackWSServer:
 
         self._clients -= dead
 
-    async def _handle_client(self, websocket: WebSocketServerProtocol) -> None:
+    async def _handle_client(self, websocket: ServerConnection) -> None:
         """Handle a single client connection."""
         self._clients.add(websocket)
-        print(f"[WS] Client connected: {websocket.remote_address}")
+        print(f"[RACK WS] Client connected: {websocket.remote_address}")
 
         # Send current order on connect
         slots_data = self._get_order_data()
@@ -231,12 +232,12 @@ class RackWSServer:
             pass
         finally:
             self._clients.discard(websocket)
-            print(f"[WS] Client disconnected: {websocket.remote_address}")
+            print(f"[RACK WS] Client disconnected: {websocket.remote_address}")
 
     async def _run_server(self) -> None:
         """Main server coroutine."""
         async with websockets.serve(self._handle_client, self.host, self.port):
-            print(f"[WS] RackWSServer listening on ws://{self.host}:{self.port}")
+            print(f"[RACK WS] RackWSServer listening on ws://{self.host}:{self.port}")
             await asyncio.Future()  # run forever
 
     def start(self) -> None:
@@ -275,12 +276,13 @@ def main():
         "--config", "-c", help="Config", type=Path, default="config.toml"
     )
     parser.add_argument(
-        "--rack-ws-port", "-p", 
-        type=int, 
-        nargs='?', 
-        const=9000, 
-        default=None, 
-        help="Rack WebSocket server on port (default: 9000 if flag present)"
+        "--rack-ws-port",
+        "-p",
+        type=int,
+        nargs="?",
+        const=9000,
+        default=None,
+        help="Rack WebSocket server on port (default: 9000 if flag present)",
     )
 
     args = parser.parse_args()
@@ -288,7 +290,7 @@ def main():
 
     print(f"Connecting to MOD server at {args.server}...")
     orchestrator = Orchestrator(args.server, config, OrchestratorMode.MANAGER)
-    
+
     # Тепер логіка працює саме так, як ви хотіли:
     if args.rack_ws_port is not None:
         print(f"Starting Rack WebSocket server on port {args.rack_ws_port}...")
