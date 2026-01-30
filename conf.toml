@@ -13,7 +13,7 @@ url = "http://127.0.0.1:18181"
 # join_audio_outputs = true
 
 [rack]
-routing_mode = "hard_bypass"  # one of [hard_bypass, linear, tripple_track, "patchbay"], default=hard_bypass
+routing_mode = "hard_bypass"  # one of [hard_bypass, linear, tripple_track], default=hard_bypass
 filter_gui_controls = true
 
 ###################
@@ -534,6 +534,24 @@ join_audio_inputs = true
 join_audio_outputs = false
 
 [[plugins]]
+name = "AMS Envelope"
+brand = "Aurelien Leblond"
+uri = "http://github.com/blablack/ams-lv2/env"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "AMS LFO2 - Freq"
+brand = "Aurelien Leblond"
+uri = "http://github.com/blablack/ams-lv2/lfo2_freq"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
 name = "AMS VCA Exp"
 brand = "Aurelien Leblond"
 uri = "http://github.com/blablack/ams-lv2/vcaexp"
@@ -546,6 +564,24 @@ join_audio_outputs = false
 name = "AMS VCA Lin"
 brand = "Aurelien Leblond"
 uri = "http://github.com/blablack/ams-lv2/vcalin"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "AMS VCF"
+brand = "Aurelien Leblond"
+uri = "http://github.com/blablack/ams-lv2/vcf"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "AMS VCO3"
+brand = "Aurelien Leblond"
+uri = "http://github.com/blablack/ams-lv2/vco3"
 category = ['ControlVoltage']
 disable_ports = []
 join_audio_inputs = false
@@ -1254,6 +1290,195 @@ join_audio_inputs = false
 join_audio_outputs = false
 
 [[plugins]]
+name = "MIDI to CV mono"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/midi-to-cv-mono"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "MIDI to CV Poly"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/midi-to-cv-poly"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Mixer"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mixer"
+category = ['Utility']
+disable_ports = []
+join_audio_inputs = true
+join_audio_outputs = true
+
+[[plugins]]
+name = "Mixer Stereo"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mixer-stereo"
+category = ['Utility']
+disable_ports = []
+join_audio_inputs = true
+join_audio_outputs = true
+
+[[plugins]]
+name = "Audio to CV"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-audio-to-cv"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Multi Button to CV"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-button-to-cv"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV ABS"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-abs"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Attenuverter Booster"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-attenuverter"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Clock"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-clock"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Control to CV"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-control"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Gate"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-gate"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV meter"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-meter"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Parameter Modulation"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-parameter-modulation"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Random Generator"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-random"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Range Divider"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-range"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Round"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-round"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "Slew Rate Limiter"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-slew"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Switchbox 1-2"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-switch1"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Switchbox 2-1"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-switch2"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Switchbox 1-3"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-switch3"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "CV Switchbox 3-1"
+brand = "MOD"
+uri = "http://moddevices.com/plugins/mod-devel/mod-cv-switch4"
+category = ['ControlVoltage']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
 name = "Switchbox 1-2 ST"
 brand = "MOD"
 uri = "http://moddevices.com/plugins/mod-devel/switchbox_1-2_st"
@@ -1438,6 +1663,15 @@ name = "Bollie Delay"
 brand = "Bollie"
 uri = "https://ca9.eu/lv2/bolliedelay"
 category = ['Delay']
+disable_ports = []
+join_audio_inputs = false
+join_audio_outputs = false
+
+[[plugins]]
+name = "AudioToCV Pitch"
+brand = "MOD/DISTRHO"
+uri = "https://distrho.kx.studio/plugins/pitchtracking#cv"
+category = ['ControlVoltage']
 disable_ports = []
 join_audio_inputs = false
 join_audio_outputs = false

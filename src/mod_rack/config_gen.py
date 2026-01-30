@@ -26,7 +26,7 @@ url = "{url}"
 # join_audio_outputs = true
 
 [rack]
-routing_mode = "{routing_mode}"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
+routing_mode = "{routing_mode}"  # one of [hard_bypass, linear, tripple_track], default=hard_bypass
 filter_gui_controls = true
 
 ###################
@@ -46,7 +46,7 @@ join_audio_outputs = {join_audio_outputs}
 
 """
 
-_ROUTING_MODES = ["hard_bypass", "linear", "dual_track", "patchbay"]
+_ROUTING_MODES = ["hard_bypass", "linear", "tripple_track", "patchbay"]
 
 
 class Args(argparse.Namespace):

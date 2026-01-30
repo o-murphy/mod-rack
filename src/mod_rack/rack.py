@@ -93,6 +93,14 @@ class PluginSlot:
     @property
     def midi_outputs(self) -> list[str]:
         return [p.graph_path for p in self.plugin.midi_outputs]
+    
+    @property
+    def cv_inputs(self) -> list[str]:
+        return [p.graph_path for p in self.plugin.cv_inputs]
+
+    @property
+    def cv_outputs(self) -> list[str]:
+        return [p.graph_path for p in self.plugin.cv_outputs]
 
     @property
     def join_audio_outputs(self) -> bool:
@@ -138,12 +146,12 @@ class HardwareSlot:
         self,
         direction: PortDirection,
         config: HardwareConfig,
-        audio_ports: list[str] | None = None,
-        midi_ports: list[str] | None = None,
     ):
         # Використовуємо звичайні атрибути, щоб вони були доступні відразу
-        self.audio_ports = audio_ports if audio_ports is not None else []
-        self.midi_ports = midi_ports if midi_ports is not None else []
+        self.audio_ports: list[str] = []
+        self.midi_ports: list[str] = []
+        self.cv_ports: list[str] = []
+
         self.direction = direction
 
         # Налаштування з конфігу
@@ -175,6 +183,14 @@ class HardwareSlot:
         return [] if self.direction == PortDirection.INPUT else self.midi_ports
 
     @property
+    def cv_outputs(self) -> list[str]:
+        return self.cv_ports if self.direction == PortDirection.INPUT else []
+
+    @property
+    def cv_inputs(self) -> list[str]:
+        return [] if self.direction == PortDirection.INPUT else self.cv_ports
+
+    @property
     def midi_outputs(self) -> list[str]:
         return self.midi_ports if self.direction == PortDirection.INPUT else []
 
@@ -187,7 +203,12 @@ class HardwareSlot:
         return self.join_audio_ports if self.direction == PortDirection.INPUT else False
 
     def __repr__(self):
-        return f"HardwareSlot({self.direction.name}, ports={self.audio_ports})"
+        return (
+            f"HardwareSlot({self.direction.name}, "
+            f"audio_ports={self.audio_ports}, "
+            f"midi_ports={self.midi_ports}, "
+            f"cv_ports={self.cv_ports})"
+        )
 
 
 AnySlot = HardwareSlot | PluginSlot
@@ -462,12 +483,10 @@ class RoutingManager:
         inputs = dst.audio_inputs
 
         # Визначаємо прапори об'єднання (join)
-        join_audio_outputs = src.join_audio_outputs
-        join_audio_inputs = dst.join_audio_inputs
+        join_outputs = src.join_audio_outputs
+        join_inputs = dst.join_audio_inputs
 
-        return cls.get_connection_pairs(
-            inputs, outputs, join_audio_inputs, join_audio_outputs
-        )
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
     def get_midi_connection_pairs(
@@ -477,12 +496,24 @@ class RoutingManager:
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
         # Визначаємо прапори об'єднання (join)
-        join_midi_outputs = True  # src.join_midi_outputs
-        join_midi_inputs = True  # dst.join_midi_inputs
+        join_outputs = True  # src.join_midi_outputs
+        join_inputs = True  # dst.join_midi_inputs
 
-        return cls.get_connection_pairs(
-            inputs, outputs, join_midi_inputs, join_midi_outputs
-        )
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
+
+    @classmethod
+    def get_cv_connection_pairs(
+        cls, src: AnySlot, dst: AnySlot
+    ) -> list[tuple[str, str]]:
+        """Розраховує пари (вихід, вхід) між двома слотами."""
+        outputs = src.cv_outputs
+        inputs = dst.cv_inputs
+
+        # Визначаємо прапори об'єднання (join)
+        join_outputs = True
+        join_inputs = True
+
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
     def calculate_chain_connections(
@@ -497,12 +528,12 @@ class RoutingManager:
                 return cls._calculate_hard_bypass_connections(
                     slots, input_slot, output_slot
                 )
-            case RoutingMode.DUAL_TRACK:
-                return cls._calculate_dual_track_connections(
+            case RoutingMode.TRIPPLE_TRACK:
+                return cls._calculate_tripple_track_connections(
                     slots, input_slot, output_slot
                 )
             case RoutingMode.LINEAR:
-                return cls._calculate_dual_track_connections(
+                return cls._calculate_tripple_track_connections(
                     slots, input_slot, output_slot
                 )
             case _:
@@ -522,8 +553,11 @@ class RoutingManager:
         for i in range(len(chain) - 1):
             audio_pairs = cls.get_audio_connection_pairs(chain[i], chain[i + 1])
             midi_pairs = cls.get_midi_connection_pairs(chain[i], chain[i + 1])
+            cv_pairs = cls.get_cv_connection_pairs(chain[i], chain[i + 1])
+
             desired.update(audio_pairs)
             desired.update(midi_pairs)
+            desired.update(cv_pairs)
 
         return desired
 
@@ -567,19 +601,32 @@ class RoutingManager:
                         if dst.midi_outputs or dst is output_slot:
                             break
 
+            # --- Робота з CV ---
+            if src.cv_outputs:
+                # Шукаємо наступний слот, у якого є хоча б один cv_input
+                for j in range(i + 1, len(chain)):
+                    dst = chain[j]
+                    if dst.cv_inputs:
+                        cv_pairs = cls.get_cv_connection_pairs(src, dst)
+                        desired.update(cv_pairs)
+                        # Аналогічно для CV
+                        if dst.cv_outputs or dst is output_slot:
+                            break
+
         return desired
 
     @classmethod
-    def _calculate_dual_track_connections(
+    def _calculate_tripple_track_connections(
         cls,
         slots: list[PluginSlot],
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
     ) -> set[tuple[str, str]]:
         """
-        Режим DUAL_TRACK: Сигнали йдуть паралельними магістралями.
+        Режим TRIPPLE_TRACK: Сигнали йдуть паралельними магістралями.
         Аудіо-ланцюг будується тільки через аудіо-плагіни.
         Міді-ланцюг будується тільки через міді-плагіни.
+        CV-ланцюг будується тільки через cv-плагіни.
         """
         desired = set()
         full_chain = [input_slot] + slots + [output_slot]
@@ -598,6 +645,13 @@ class RoutingManager:
             src, dst = midi_nodes[i], midi_nodes[i + 1]
             if src.midi_outputs and dst.midi_inputs:
                 desired.update(cls.get_midi_connection_pairs(src, dst))
+
+        # 3. Формуємо cv-магістраль
+        cv_nodes = [s for s in full_chain if s.cv_inputs or s.cv_outputs]
+        for i in range(len(cv_nodes) - 1):
+            src, dst = cv_nodes[i], cv_nodes[i + 1]
+            if src.cv_outputs and dst.cv_inputs:
+                desired.update(cls.get_cv_connection_pairs(src, dst))
 
         return desired
 
@@ -768,7 +822,7 @@ class Orchestrator:
         """
         _Color.blue(f"+ HW {event.port_type.name} {event.direction.name}: {event.name}")
 
-        if event.port_type not in {PortType.AUDIO, PortType.MIDI}:
+        if event.port_type not in {PortType.AUDIO, PortType.MIDI, PortType.CV}:
             return
 
         if event.direction not in {PortDirection.INPUT, PortDirection.OUTPUT}:
@@ -783,8 +837,10 @@ class Orchestrator:
 
         if event.port_type == PortType.AUDIO:
             ports_list = slot.audio_ports
-        else:
+        elif event.port_type == PortType.MIDI:
             ports_list = slot.midi_ports
+        elif event.port_type == PortType.CV:
+            ports_list = slot.cv_ports
 
         if event.name not in hw_config.disable_ports:
             if event.name not in ports_list:
@@ -803,6 +859,9 @@ class Orchestrator:
                 break
             if event.name in slot.midi_ports:
                 slot.midi_ports.remove(event.name)
+                break
+            if event.name in slot.cv_ports:
+                slot.cv_ports.remove(event.name)
                 break
 
         self._schedule_reorder()
