@@ -14,6 +14,7 @@ from mod_rack.client import (
     GraphParamSetEvent,
 )
 from mod_rack.plugin import Plugin
+from mod_rack.service import RackWSServer
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -796,6 +797,8 @@ class MainWindow(QMainWindow):
 
 def main():
     import argparse
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
 
     parser = argparse.ArgumentParser(description="MOD Rack Controller")
     parser.add_argument(
@@ -805,17 +808,37 @@ def main():
         "--config", "-c", help="Config", type=Path, default="config.toml"
     )
     parser.add_argument("--slave", help="Slave", action="store_true")
-    args = parser.parse_args()
 
+    # Додаємо аргумент для порту WebSocket
+    parser.add_argument(
+        "--rack-ws-port",
+        "-p",
+        type=int,
+        nargs="?",
+        const=9000,
+        default=None,
+        help="Rack WebSocket server on port (default: 9000 if flag present)",
+    )
+
+    args = parser.parse_args()
     config = Config.load(args.config)
 
-    # Create rack (do not force reset on init — build state from WebSocket)
+    # ВАЖЛИВО: Переконайтеся, що RackWSServer імпортований
+    # з вашого файлу ws_server.py
+    # from mod_rack.ws_server import RackWSServer
+
     print(f"Connecting to MOD server at {args.server}...")
-    rack = Rack(
-        args.server,
-        config,
-        OrchestratorMode.OBSERVER if args.slave else OrchestratorMode.MANAGER,
-    )
+
+    # Ви використовували назву Orchestrator у попередніх файлах
+    # Якщо у вас клас називається Rack, логіка залишається такою ж
+    mode = OrchestratorMode.OBSERVER if args.slave else OrchestratorMode.MANAGER
+    rack = Rack(args.server, config, mode)
+
+    # Запуск WebSocket сервера, якщо вказано прапорець
+    if args.rack_ws_port is not None:
+        print(f"Starting Rack WebSocket server on port {args.rack_ws_port}...")
+        ws_server = RackWSServer(rack, port=args.rack_ws_port)
+        ws_server.start()  # Запускається у фоновому потоці
 
     # Create and run app
     app = QApplication(sys.argv)
@@ -825,18 +848,16 @@ def main():
 
     window = MainWindow(rack)
     title = window.windowTitle()
-    if args.slave:
-        window.setWindowTitle(title + " (SLAVE)")
-    else:
-        window.setWindowTitle(title + " (MASTER)")
+    window.setWindowTitle(f"{title} ({'SLAVE' if args.slave else 'MASTER'})")
 
     window.show()
 
-    # Timer for Ctrl+C on Linux/Windows
+    # Timer для обробки сигналів (Ctrl+C)
     timer = QTimer()
     timer.start(500)
     timer.timeout.connect(lambda: None)
 
+    # Запуск циклу подій GUI
     sys.exit(app.exec())
 
 
