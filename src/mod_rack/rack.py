@@ -905,7 +905,7 @@ class Orchestrator:
         if not self._loading and not self.normalizing:
             self._schedule_reorder()
 
-    def _normalize_layout(self, /, force: bool = False):
+    def _normalize_layout(self, *, force: bool = False):
         if self._loading:
             return
 
@@ -937,7 +937,7 @@ class Orchestrator:
             with self._lock:
                 self.normalizing = False
 
-    def _reorder_slots_by_pos(self, /, force_emit=False):
+    def _reorder_slots_by_pos(self, *, force_emit=False):
         with self._lock:
             # sort slots by pos
             old_order = [s.label for s in self.slots]
@@ -953,7 +953,7 @@ class Orchestrator:
                 self.reconnect_seamless()
                 self._order_changed_emit()
 
-    def _schedule_reorder(self, /, force_emit: bool = False):
+    def _schedule_reorder(self, *, force_emit: bool = False):
         if self._reorder_timer:
             self._reorder_timer.cancel()
 

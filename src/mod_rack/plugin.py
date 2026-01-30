@@ -46,7 +46,13 @@ class Plugin:
     """
 
     def __init__(
-        self, client: Client, uri: str, label: str, config: PluginConfig | None = None
+        self,
+        client: Client,
+        uri: str,
+        label: str,
+        config: PluginConfig | None = None,
+        *,
+        filter_gui_controls: bool = True,
     ):
         self.client = client
         self.uri = uri
@@ -79,7 +85,7 @@ class Plugin:
             self.uri, "screenshot.png"
         )
         self._load_plugin_ports()
-        self._load_controls()
+        self._load_controls(filter_gui_controls)
         self._subscribe()
 
     def _subscribe(self):
@@ -97,7 +103,11 @@ class Plugin:
 
     @classmethod
     def load_supported(
-        cls, client: Client, uri: str, label: str, config: Config
+        cls,
+        client: Client,
+        uri: str,
+        label: str,
+        config: Config,
     ) -> Plugin | None:
         # Перевіряємо whitelist
         plugin_config = config.get_plugin_by_uri(uri)
@@ -110,6 +120,7 @@ class Plugin:
             uri=uri,
             label=label,
             config=plugin_config,
+            filter_gui_controls=config.rack.filter_gui_controls
         )
         return plugin
 
@@ -180,9 +191,11 @@ class Plugin:
             f"Parsed midi ports: inputs={self.midi_inputs}, outputs={self.midi_outputs}"
         )
 
-    def _load_controls(self) -> None:
+    def _load_controls(self, filter_gui_controls: bool = False) -> None:
         """Load control metadata from effect_get response."""
-        controls = parse_control_ports(self._effect_data)
+        controls = parse_control_ports(
+            self._effect_data, filter_gui_controls=filter_gui_controls
+        )
         self._controls = {c.symbol: c for c in controls}
 
     # --- Dict-like access to control values ---

@@ -52,6 +52,7 @@ class RoutingMode(Enum):
 class RackConfig:
     # Maximum number of slots allowed (None = unlimited)
     routing_mode: RoutingMode = RoutingMode.HARD_BYPASS
+    filter_gui_controls: bool = True 
 
 
 @dataclass
@@ -94,6 +95,7 @@ class Config:
             routing_mode = RoutingMode.HARD_BYPASS
         rack = RackConfig(
             routing_mode=routing_mode,
+            filter_gui_controls=rack_data.get("filter_gui_controls", True)
         )
 
         plugins = []
