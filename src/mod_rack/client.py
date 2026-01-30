@@ -517,7 +517,7 @@ class WsConnection:
         try:
             if self._ws is not None and self.connected:
                 self._ws.send(message)
-            print(f"WS >> {message}")
+            print(f"[MOD WS] >> {message}")
             return True
         except Exception:
             return False
@@ -749,7 +749,7 @@ class WsClient:
 
     def _on_message(self, message: str):
         # Log unknown messages
-        print(f"WS << {message}")
+        print(f"[MOD WS] << {message}")
 
         event = WsProtocol.parse(message)
         if not event:
