@@ -8,7 +8,7 @@ Python client for MODEP/MOD-UI audio plugin host.
 - WebSocket client for real-time parameter feedback
 - Reactive architecture (Server-as-Source-of-Truth)
 - Automatic audio and MIDI routing with smart channel pairing
-- Multiple routing modes (linear, hard_bypass, dual_track)
+- Multiple routing modes (linear, hard_bypass, tripple_track)
 - Plugin whitelist with port override support
 
 ## Architecture
@@ -86,7 +86,7 @@ This is useful for:
 The `routing_mode` parameter controls how audio and MIDI signals are routed through the plugin chain:
 
 - **`hard_bypass`** (default) — each output seeks the nearest next input of the same type; plugins without matching ports are bypassed. Audio and MIDI are routed independently.
-- **`dual_track`** — audio and MIDI form separate parallel chains. Audio-only plugins are skipped in the MIDI chain and vice versa.
+- **`tripple_track`** — audio and MIDI form separate parallel chains. Audio-only plugins are skipped in the MIDI chain and vice versa.
 - **`linear`** — strict sequential chain 1→2→3, connecting both audio and MIDI between adjacent slots.
 
 ### Audio Routing

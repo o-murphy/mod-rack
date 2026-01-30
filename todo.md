@@ -23,4 +23,4 @@
 - [x] WebSocket callbacks for params/bypass
 - [x] Smart channel routing (mono/stereo conversion)
 - [x] Plugin whitelist with port override
-- [x] MIDI routing (ports, routing modes: linear, hard_bypass, dual_track)
+- [x] MIDI routing (ports, routing modes: linear, hard_bypass, tripple_track)

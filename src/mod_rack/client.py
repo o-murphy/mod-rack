@@ -356,7 +356,7 @@ class WsProtocol:
                 return LoadingEndEvent()
 
             # audio port
-            case ["add_hw_port", instance, "audio" | "midi" as typ, dir_, *_]:
+            case ["add_hw_port", instance, "audio" | "midi" | "cv" as typ, dir_, *_]:
                 try:
                     return GraphAddHwPortEvent(
                         name=instance.removeprefix(prefix),
