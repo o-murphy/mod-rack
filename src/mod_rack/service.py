@@ -295,7 +295,7 @@ def main():
         ws_server = RackWSServer(orchestrator, port=args.rack_ws_port)
         ws_server.start()
     else:
-        print("Rack WebSocket server disabled (no --ws-port flag provided).")
+        print("Rack WebSocket server disabled (no rack-ws-port flag provided).")
 
     try:
         orchestrator.run()
