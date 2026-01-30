@@ -7,7 +7,6 @@ dict-like access to control parameters with automatic API synchronization.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Iterator
 
 from mod_rack.client import (

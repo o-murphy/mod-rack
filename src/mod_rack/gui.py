@@ -534,10 +534,7 @@ class ControlsPanel(QScrollArea):
 
         in_row = in_col = 0
 
-        controls = sorted(
-            (plugin[symbol] for symbol in plugin),
-            key=lambda c: c.index
-        )
+        controls = sorted((plugin[symbol] for symbol in plugin), key=lambda c: c.index)
 
         for control in controls:
             widget = create_control_widget(control)

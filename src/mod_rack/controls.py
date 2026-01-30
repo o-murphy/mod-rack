@@ -246,7 +246,13 @@ class ControlPort(Port):
         return formatted
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], graph_path: str, port_type: PortType, direction: PortDirection) -> "ControlPort":
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        graph_path: str,
+        port_type: PortType,
+        direction: PortDirection,
+    ) -> "ControlPort":
         """Parse control port from API response."""
         ranges = data.get("ranges", {})
         units_data = data.get("units", {})
@@ -258,7 +264,6 @@ class ControlPort(Port):
             graph_path=graph_path,
             port_type=port_type,
             direction=direction,
-
             short_name=data.get("shortName", data.get("name", "")),
             index=data.get("index", 0),
             minimum=float(ranges.get("minimum", 0.0)),
@@ -276,8 +281,7 @@ class ControlPort(Port):
 
 
 def parse_control_ports(
-    plugin_label: str,
-    effect_data: dict[str, Any], *, filter_gui_controls: bool = True
+    plugin_label: str, effect_data: dict[str, Any], *, filter_gui_controls: bool = True
 ) -> list[ControlPort]:
     """
     Parse all control input ports from effect_get response.
@@ -312,7 +316,7 @@ def parse_control_ports(
                 port_data,
                 graph_path=f"{plugin_label}/{port_data['symbol']}",
                 port_type=PortType.CONTROL,
-                direction=PortDirection.INPUT
+                direction=PortDirection.INPUT,
             )
             for port_data in inputs
             if port_data.get("valid", True)
@@ -325,7 +329,8 @@ def parse_control_ports(
                 port_data,
                 graph_path=f"{plugin_label}/{port_data['symbol']}",
                 port_type=PortType.CONTROL,
-                direction=PortDirection.OUTPUT)
+                direction=PortDirection.OUTPUT,
+            )
             for port_data in outputs
             if port_data.get("valid", True)
         ]

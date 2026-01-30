@@ -43,8 +43,8 @@ class MainWindow(QMainWindow):
             cb = QCheckBox("Bypass")
             cb.setChecked(slot.get("bypassed", False))
             cb.stateChanged.connect(
-                lambda state, l=slot["label"]: self.client.send_cmd(
-                    {"cmd": "set_bypass", "label": l, "bypassed": bool(state)}
+                lambda state, lbl=slot["label"]: self.client.send_cmd(
+                    {"cmd": "set_bypass", "label": lbl, "bypassed": bool(state)}
                 )
             )
             self.layout.addWidget(cb)
@@ -66,13 +66,13 @@ class MainWindow(QMainWindow):
                     # При зміні - надсилаємо команду на сервер
                     slider.valueChanged.connect(
                         lambda v,
-                        l=slot["label"],
+                        lbl=slot["label"],
                         s=ctrl["symbol"],
                         min_v=ctrl["minimum"],
                         max_v=ctrl["maximum"]: self.client.send_cmd(
                             {
                                 "cmd": "set_param",
-                                "label": l,
+                                "label": lbl,
                                 "symbol": s,
                                 "value": min_v + (v / 1000) * (max_v - min_v),
                             }

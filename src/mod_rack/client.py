@@ -154,7 +154,7 @@ class PortDirection(Enum):
 class Port:
     """Audio/CV/MIDI/CONTROL port on a plugin."""
 
-     # Identity
+    # Identity
     symbol: str  # LV2 symbol, used in API calls
     name: str  # Display name
     graph_path: str

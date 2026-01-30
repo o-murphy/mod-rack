@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import websockets
-from websockets.server import WebSocketServerProtocol
+from websockets.asyncio.server import ServerConnection
 
 from mod_rack.client import (
     GraphOutputSetEvent,
@@ -32,6 +32,7 @@ def _serialize_control(ctrl: ControlPort) -> dict:
     return {
         "symbol": ctrl.symbol,
         "name": ctrl.name,
+        "port_type": ctrl.port_type.name,
         "direction": ctrl.direction.name,
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
@@ -77,7 +78,7 @@ class RackWSServer:
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
-        self._clients: set[WebSocketServerProtocol] = set()
+        self._clients: set[ServerConnection] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server_task: asyncio.Task | None = None
 
@@ -187,7 +188,7 @@ class RackWSServer:
 
         self._clients -= dead
 
-    async def _handle_client(self, websocket: WebSocketServerProtocol) -> None:
+    async def _handle_client(self, websocket: ServerConnection) -> None:
         """Handle a single client connection."""
         self._clients.add(websocket)
         print(f"[WS] Client connected: {websocket.remote_address}")
@@ -275,12 +276,13 @@ def main():
         "--config", "-c", help="Config", type=Path, default="config.toml"
     )
     parser.add_argument(
-        "--rack-ws-port", "-p", 
-        type=int, 
-        nargs='?', 
-        const=9000, 
-        default=None, 
-        help="Rack WebSocket server on port (default: 9000 if flag present)"
+        "--rack-ws-port",
+        "-p",
+        type=int,
+        nargs="?",
+        const=9000,
+        default=None,
+        help="Rack WebSocket server on port (default: 9000 if flag present)",
     )
 
     args = parser.parse_args()
@@ -288,7 +290,7 @@ def main():
 
     print(f"Connecting to MOD server at {args.server}...")
     orchestrator = Orchestrator(args.server, config, OrchestratorMode.MANAGER)
-    
+
     # Тепер логіка працює саме так, як ви хотіли:
     if args.rack_ws_port is not None:
         print(f"Starting Rack WebSocket server on port {args.rack_ws_port}...")
