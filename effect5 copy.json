@@ -1,0 +1,186 @@
+{
+    "valid": true,
+    "uri": "http://moddevices.com/plugins/mod-devel/mod-cv-switch1",
+    "name": "CV Switchbox 1-2",
+    "binary": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/mod-cv-switch1.so",
+    "brand": "MOD",
+    "label": "CV Switchbox 1-2",
+    "license": "",
+    "comment": "\nCV Switchbox 1-2 routes one cv input to either one of the two outputs.\n\nFeatures:\nPlugin by MOD Devices\n",
+    "buildEnvironment": "",
+    "category": [
+        "ControlVoltage"
+    ],
+    "microVersion": 0,
+    "minorVersion": 1,
+    "release": 0,
+    "builder": 0,
+    "licensed": 0,
+    "iotype": 0,
+    "hasExternalUI": false,
+    "version": "1.0",
+    "stability": "testing",
+    "author": {
+        "name": "MOD",
+        "homepage": "http://moddevices.com",
+        "email": "mailto:jarno@moddevices.com"
+    },
+    "bundles": [
+        "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/"
+    ],
+    "gui": {
+        "resourcesDirectory": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/modgui",
+        "iconTemplate": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/modgui/icon-cv-switchbox-1-2.html",
+        "settingsTemplate": "",
+        "javascript": "",
+        "stylesheet": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/modgui/stylesheet-cv-switchbox-1-2.css",
+        "screenshot": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/modgui/switchbox_cv_1to2_ss.png",
+        "thumbnail": "/home/murphy/mod-desktop/mod-desktop/plugins/mod-cv-switch1.lv2/modgui/switchbox_cv_1to2_tn.png",
+        "discussionURL": "",
+        "documentation": "",
+        "brand": "MOD",
+        "label": "CV Switchbox 1-2",
+        "model": "",
+        "panel": "",
+        "color": "",
+        "knob": "",
+        "ports": [
+            {
+                "valid": true,
+                "index": 0,
+                "name": "Channel",
+                "symbol": "Switch"
+            }
+        ],
+        "monitoredOutputs": []
+    },
+    "ports": {
+        "audio": {
+            "input": [],
+            "output": []
+        },
+        "control": {
+            "input": [
+                {
+                    "valid": true,
+                    "index": 3,
+                    "name": "Channel",
+                    "symbol": "Switch",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "enumeration",
+                        "integer"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [
+                        {
+                            "valid": true,
+                            "value": 0.0,
+                            "label": "1"
+                        },
+                        {
+                            "valid": true,
+                            "value": 1.0,
+                            "label": "2"
+                        }
+                    ],
+                    "shortName": "Channel"
+                }
+            ],
+            "output": []
+        },
+        "cv": {
+            "input": [
+                {
+                    "valid": true,
+                    "index": 0,
+                    "name": "CV in",
+                    "symbol": "CVin",
+                    "ranges": {
+                        "minimum": -5.0,
+                        "maximum": 5.0,
+                        "default": -5.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "CV in"
+                }
+            ],
+            "output": [
+                {
+                    "valid": true,
+                    "index": 1,
+                    "name": "CV out1",
+                    "symbol": "CVout1",
+                    "ranges": {
+                        "minimum": -5.0,
+                        "maximum": 5.0,
+                        "default": -5.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "CV out1"
+                },
+                {
+                    "valid": true,
+                    "index": 2,
+                    "name": "CV out2",
+                    "symbol": "CVout2",
+                    "ranges": {
+                        "minimum": -5.0,
+                        "maximum": 5.0,
+                        "default": -5.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "CV out2"
+                }
+            ]
+        },
+        "midi": {
+            "input": [],
+            "output": []
+        }
+    },
+    "parameters": [],
+    "presets": []
+}

@@ -7,9 +7,9 @@ url = "http://192.168.88.247:80/"
 [hardware]
 # disable_ports = ["capture_1"] #, "capture_2"]
 # All-to-all routing: connect all hardware inputs to all first plugin inputs
-# join_audio_inputs = true
+# join_inputs = true
 # All-to-all routing: connect all last plugin outputs to all hardware outputs
-# join_audio_outputs = true
+# join_outputs = true
 
 [rack]
 routing_mode = "hard_bypass"  # one of [hard_bypass, linear, tripple_track], default=hard_bypass
@@ -392,7 +392,7 @@ category = "spatial"
 
 # NOTE: use it to override inputs
 # disable_inputs = ["lv2_audio_in_1", "lv2_audio_out_1"]
-# join_audio_inputs = true
+# join_inputs = true
 
 # --- FILTER ---
 
@@ -454,7 +454,7 @@ category = "modulator"
 name = "Triple chorus"
 uri = "http://drobilla.net/plugins/fomp/triple_chorus"
 category = "modulator"
-join_audio_outputs = true
+join_outputs = true
 
 [[plugins]]
 name = "setBfree Whirl Speaker"

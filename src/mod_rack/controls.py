@@ -11,89 +11,27 @@ Provides typed dataclasses for plugin control ports with support for:
 
 import math
 from dataclasses import dataclass, field
-from enum import Flag, auto
-from typing import Any
 
-from mod_rack.client import PortDirection, Port, PortType
+from mod_rack.schema.effect import (
+    Effect,
+    ScalePoint,
+    Units,
+    PortDirection,
+    Port,
+    PortType,
+)
 
 
 __all__ = [
-    "ControlProperties",
     "ScalePoint",
     "Units",
-    "ControlPort",
+    "PortControl",
     "parse_control_ports",
 ]
 
 
-class ControlProperties(Flag):
-    """LV2 control port properties as flags."""
-
-    NONE = 0
-    TOGGLED = auto()  # On/off switch (0.0 or 1.0)
-    INTEGER = auto()  # Discrete integer values
-    LOGARITHMIC = auto()  # Logarithmic scale
-    ENUMERATION = auto()  # Selector with scale points
-    TRIGGER = auto()  # Momentary button (resets to default)
-    HAS_STRICT_BOUNDS = auto()  # Value must stay within min/max
-    NOT_ON_GUI = auto()  # Hidden from GUI
-
-    @classmethod
-    def from_list(cls, properties: list[str]) -> "ControlProperties":
-        """Parse properties list from API response."""
-        result = cls.NONE
-        mapping = {
-            "toggled": cls.TOGGLED,
-            "integer": cls.INTEGER,
-            "logarithmic": cls.LOGARITHMIC,
-            "enumeration": cls.ENUMERATION,
-            "trigger": cls.TRIGGER,
-            "hasStrictBounds": cls.HAS_STRICT_BOUNDS,
-            "notOnGUI": cls.NOT_ON_GUI,
-        }
-        for prop in properties:
-            if prop in mapping:
-                result |= mapping[prop]
-        return result
-
-
-@dataclass(frozen=True, slots=True)
-class ScalePoint:
-    """A discrete value option for enumeration controls."""
-
-    value: float
-    label: str
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ScalePoint":
-        return cls(
-            value=float(data.get("value", 0.0)),
-            label=str(data.get("label", "")),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class Units:
-    """Unit information for control display."""
-
-    symbol: str  # e.g., "dB", "Hz", "ms"
-    label: str  # e.g., "decibels", "hertz"
-    render: str  # Format string for display
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Units | None":
-        symbol = data.get("symbol", "")
-        if not symbol:
-            return None
-        return cls(
-            symbol=symbol,
-            label=data.get("label", ""),
-            render=data.get("render", ""),
-        )
-
-
 @dataclass(slots=True)
-class ControlPort(Port):
+class PortControl:
     """
     A plugin control port with full metadata.
 
@@ -104,22 +42,59 @@ class ControlPort(Port):
     - Trigger: momentary button that resets to default
     """
 
-    short_name: str  # Abbreviated name
-    index: int  # Port index in plugin
-
-    # Value range
-    minimum: float
-    maximum: float
-    default: float
-
-    # Type information
-    properties: ControlProperties
-    scale_points: tuple[ScalePoint, ...] = field(default_factory=tuple)
-    units: Units | None = None
-    range_steps: int = 0  # 0 = continuous
+    port: Port
+    graph_path: str
+    port_type: PortType
+    direction: PortDirection
 
     # Runtime state (mutable)
     _value: float | None = field(default=None, repr=False)
+
+    @property
+    def index(self) -> int:
+        return self.port.index
+
+    @property
+    def name(self) -> str:
+        return self.port.name
+
+    @property
+    def symbol(self) -> str:
+        return self.port.symbol
+
+    @property
+    def properties(self) -> list[str]:
+        return self.port.properties
+
+    @property
+    def default(self) -> float:
+        if self.port.ranges:
+            return self.port.ranges.default
+        return 0.0
+
+    @property
+    def maximum(self) -> float:
+        if self.port.ranges:
+            return self.port.ranges.maximum
+        return 0.0
+
+    @property
+    def minimum(self) -> float:
+        if self.port.ranges:
+            return self.port.ranges.minimum
+        return 0.0
+
+    @property
+    def units(self) -> Units | None:
+        return self.port.units
+
+    @property
+    def range_steps(self) -> int:
+        return self.port.rangeSteps
+
+    @property
+    def scale_points(self) -> list[ScalePoint]:
+        return self.port.scalePoints
 
     @property
     def value(self) -> float:
@@ -136,27 +111,27 @@ class ControlPort(Port):
     @property
     def is_toggled(self) -> bool:
         """Is this an on/off switch?"""
-        return ControlProperties.TOGGLED in self.properties
+        return "toggled" in self.properties
 
     @property
     def is_integer(self) -> bool:
         """Does this use discrete integer values?"""
-        return ControlProperties.INTEGER in self.properties
+        return "integer" in self.properties
 
     @property
     def is_logarithmic(self) -> bool:
         """Does this use logarithmic scaling?"""
-        return ControlProperties.LOGARITHMIC in self.properties
+        return "logarithmic" in self.properties
 
     @property
     def is_enumeration(self) -> bool:
         """Is this a selector with named options?"""
-        return ControlProperties.ENUMERATION in self.properties
+        return "enumeration" in self.properties
 
     @property
     def is_trigger(self) -> bool:
         """Is this a momentary trigger button?"""
-        return ControlProperties.TRIGGER in self.properties
+        return "trigger" in self.properties
 
     @property
     def is_continuous(self) -> bool:
@@ -245,44 +220,10 @@ class ControlPort(Port):
             return f"{formatted} {self.units.symbol}"
         return formatted
 
-    @classmethod
-    def from_dict(
-        cls,
-        data: dict[str, Any],
-        graph_path: str,
-        port_type: PortType,
-        direction: PortDirection,
-    ) -> "ControlPort":
-        """Parse control port from API response."""
-        ranges = data.get("ranges", {})
-        units_data = data.get("units", {})
-        scale_points_data = data.get("scalePoints", [])
-
-        return cls(
-            symbol=data.get("symbol", ""),
-            name=data.get("name", ""),
-            graph_path=graph_path,
-            port_type=port_type,
-            direction=direction,
-            short_name=data.get("shortName", data.get("name", "")),
-            index=data.get("index", 0),
-            minimum=float(ranges.get("minimum", 0.0)),
-            maximum=float(ranges.get("maximum", 1.0)),
-            default=float(ranges.get("default", 0.0)),
-            properties=ControlProperties.from_list(data.get("properties", [])),
-            scale_points=tuple(
-                ScalePoint.from_dict(sp)
-                for sp in scale_points_data
-                if sp.get("valid", True)
-            ),
-            units=Units.from_dict(units_data),
-            range_steps=data.get("rangeSteps", 0),
-        )
-
 
 def parse_control_ports(
-    plugin_label: str, effect_data: dict[str, Any], *, filter_gui_controls: bool = True
-) -> list[ControlPort]:
+    plugin_label: str, effect: Effect, *, filter_gui_controls: bool = True
+) -> list[PortControl]:
     """
     Parse all control input ports from effect_get response.
 
@@ -292,16 +233,13 @@ def parse_control_ports(
     Returns:
         List of ControlPort objects for all control inputs
     """
-    ports = effect_data.get("ports", {})
-    control_ports = ports.get("control", {})
-    inputs = control_ports.get("input", [])
-    outputs = control_ports.get("output", [])
+    control_ports = effect.ports.control
+    inputs = control_ports.input
+    outputs = control_ports.output
 
-    def _filter_gui_controls(controls_list):
+    def _filter_gui_controls(controls_list: list[Port]):
         return [
-            control
-            for control in controls_list
-            if "notOnGUI" not in control.get("properties", [])
+            control for control in controls_list if "notOnGUI" not in control.properties
         ]
 
     if filter_gui_controls:
@@ -312,27 +250,27 @@ def parse_control_ports(
 
     controls.extend(
         [
-            ControlPort.from_dict(
+            PortControl(
                 port_data,
-                graph_path=f"{plugin_label}/{port_data['symbol']}",
+                graph_path=f"{plugin_label}/{port_data.symbol}",
                 port_type=PortType.CONTROL,
                 direction=PortDirection.INPUT,
             )
             for port_data in inputs
-            if port_data.get("valid", True)
+            if port_data.valid
         ]
     )
 
     controls.extend(
         [
-            ControlPort.from_dict(
+            PortControl(
                 port_data,
-                graph_path=f"{plugin_label}/{port_data['symbol']}",
+                graph_path=f"{plugin_label}/{port_data.symbol}",
                 port_type=PortType.CONTROL,
                 direction=PortDirection.OUTPUT,
             )
             for port_data in outputs
-            if port_data.get("valid", True)
+            if port_data.valid
         ]
     )
 

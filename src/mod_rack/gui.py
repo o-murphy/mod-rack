@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
-from mod_rack import Config, Rack, ControlPort, DEFAULT_SERVER_URL
+from mod_rack import Config, Rack, PortControl, DEFAULT_SERVER_URL
 from mod_rack.client import PortDirection
 from mod_rack.rack import OrchestratorMode
 
@@ -55,7 +55,7 @@ class ControlWidget(QWidget):
     # Ignore incoming WS updates for this duration after a local change
     LOCAL_CHANGE_COOLDOWN_MS = 100
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(parent)
         self.control = control
         self._local_change_timer = QTimer(self)
@@ -83,7 +83,7 @@ class KnobControl(ControlWidget):
 
     SLIDER_STEPS = 1000
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -134,7 +134,7 @@ class KnobControl(ControlWidget):
 class ToggleControl(ControlWidget):
     """Checkbox for toggle controls."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QHBoxLayout(self)
@@ -159,7 +159,7 @@ class ToggleControl(ControlWidget):
 class EnumControl(ControlWidget):
     """ComboBox for enumeration controls."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -205,7 +205,7 @@ class EnumControl(ControlWidget):
 class IntegerControl(ControlWidget):
     """Slider for integer controls (non-enum)."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -243,7 +243,7 @@ class IntegerControl(ControlWidget):
 class MeterControl(ControlWidget):
     """Read-only label for output controls (meters, indicators)."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -266,7 +266,7 @@ class MeterControl(ControlWidget):
         self.value_label.setText(f"{normalized:.2f}")
 
 
-def create_control_widget(control: ControlPort, parent=None) -> ControlWidget:
+def create_control_widget(control: PortControl, parent=None) -> ControlWidget:
     """Factory function to create appropriate widget for control type."""
     # Output controls are read-only meters
     if control.direction == PortDirection.OUTPUT:
@@ -481,7 +481,7 @@ class ControlsPanel(QScrollArea):
         self.placeholder.setAlignment(Qt.AlignCenter)
         self._layout.addWidget(self.placeholder)
 
-    def set_plugin(self, plugin, label: str | None = None):
+    def set_plugin(self, plugin: Plugin | None, label: str | None = None):
         """Set the plugin to display controls for."""
         # Clear existing
         self._clear_controls()
@@ -534,7 +534,7 @@ class ControlsPanel(QScrollArea):
 
         in_row = in_col = 0
 
-        controls = sorted((plugin[symbol] for symbol in plugin), key=lambda c: c.index)
+        controls = plugin.controls.values()
 
         for control in controls:
             widget = create_control_widget(control)

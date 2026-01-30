@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from enum import Enum
 import socket
 import ssl
 import struct
@@ -13,16 +12,14 @@ from urllib.parse import unquote, urlparse
 import requests
 import websocket
 
+from mod_rack.schema.effect import PortDirection, PortType
+
 __all__ = [
     # Client
     "Client",
     "WsConnection",
     "WsProtocol",
     "WsClient",
-    # Client:Port
-    "PortType",
-    "PortDirection",
-    "Port",
     # Client:Generic
     "WsEvent",
     "EventCallBack",
@@ -138,48 +135,26 @@ class PbSizeEvent:
     y: int = field(compare=False)
 
 
-class PortType(Enum):
-    AUDIO = "audio"
-    MIDI = "midi"
-    CV = "cv"
-    CONTROL = "control"
-
-
-class PortDirection(Enum):
-    INPUT = "0"
-    OUTPUT = "1"
-
-
-@dataclass(slots=True)
-class Port:
-    """Audio/CV/MIDI/CONTROL port on a plugin."""
-
-    # Identity
-    symbol: str  # LV2 symbol, used in API calls
-    name: str  # Display name
-    graph_path: str
-    port_type: PortType
-    direction: PortDirection
-
-
 @dataclass(frozen=True)
 class _BaseHwPortEvent:
-    name: str
+    symbol: str
 
     def __eq__(self, other):
         # Порівнюємо тільки за іменем порту
         if isinstance(other, _BaseHwPortEvent):
-            return self.name == other.name
+            return self.symbol == other.symbol
         return False
 
     def __hash__(self):
-        return hash(self.name)
+        return hash(self.symbol)
 
 
 @dataclass(frozen=True)
 class GraphAddHwPortEvent(_BaseHwPortEvent):
     port_type: PortType = field(compare=False)
     direction: PortDirection = field(compare=False)
+    name: str = field(compare=False)
+    index: int = field(compare=False)
 
 
 @dataclass(frozen=True)
@@ -356,19 +331,29 @@ class WsProtocol:
                 return LoadingEndEvent()
 
             # audio port
-            case ["add_hw_port", instance, "audio" | "midi" | "cv" as typ, dir_, *_]:
+            case [
+                "add_hw_port",
+                instance,
+                "audio" | "midi" | "cv" as pt,
+                pd,
+                pn,
+                idx,
+                *_,
+            ]:
                 try:
                     return GraphAddHwPortEvent(
-                        name=instance.removeprefix(prefix),
-                        port_type=PortType(typ),
-                        direction=PortDirection(dir_),
+                        symbol=instance.removeprefix(prefix),
+                        port_type=PortType(pt),
+                        direction=PortDirection.from_int(int(pd)),
+                        name=pn,
+                        index=int(idx),
                     )
                 except ValueError as e:
                     print(e)
                     return None
 
             case ["remove_hw_port", instance, *_]:
-                return GraphRemoveHwPortEvent(name=instance.removeprefix(prefix))
+                return GraphRemoveHwPortEvent(symbol=instance.removeprefix(prefix))
 
             # plugin_pos /graph/label x y
             case ["plugin_pos", inst, rx, ry, *_]:

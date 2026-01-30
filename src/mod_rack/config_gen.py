@@ -21,9 +21,9 @@ url = "{url}"
 [hardware]
 # disable_ports = ["capture_1"] #, "capture_2"]
 # All-to-all routing: connect all hardware inputs to all first plugin inputs
-# join_audio_inputs = true
+# join_inputs = true
 # All-to-all routing: connect all last plugin outputs to all hardware outputs
-# join_audio_outputs = true
+# join_outputs = true
 
 [rack]
 routing_mode = "{routing_mode}"  # one of [hard_bypass, linear, tripple_track], default=hard_bypass
@@ -41,8 +41,8 @@ brand = "{brand}"
 uri = "{uri}"
 category = {category}
 disable_ports = {disable_ports}
-join_audio_inputs = {join_audio_inputs}
-join_audio_outputs = {join_audio_outputs}
+join_inputs = {join_inputs}
+join_outputs = {join_outputs}
 
 """
 
@@ -73,12 +73,8 @@ class _KnownPlugins:
     def apply_fix(self, plugin_info: dict) -> dict:
         if fix := self.known.get(plugin_info["uri"]):
             plugin_info.update(fix)
-            plugin_info["join_audio_inputs"] = str(
-                plugin_info["join_audio_inputs"]
-            ).lower()
-            plugin_info["join_audio_outputs"] = str(
-                plugin_info["join_audio_outputs"]
-            ).lower()
+            plugin_info["join_inputs"] = str(plugin_info["join_inputs"]).lower()
+            plugin_info["join_outputs"] = str(plugin_info["join_outputs"]).lower()
         return plugin_info
 
 
@@ -134,8 +130,8 @@ def main():
                 "brand": plugin["brand"],
                 "category": plugin["category"],
                 "disable_ports": [],
-                "join_audio_inputs": "false",
-                "join_audio_outputs": "false",
+                "join_inputs": "false",
+                "join_outputs": "false",
             }
 
             if not ns.allow_all and not known.is_supported(info_dict):

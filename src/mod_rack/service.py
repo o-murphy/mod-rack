@@ -21,13 +21,13 @@ from mod_rack.client import (
     GraphParamSetEvent,
     GraphParamSetBypassEvent,
 )
-from mod_rack.controls import ControlPort
+from mod_rack.controls import PortControl
 
 if TYPE_CHECKING:
     from mod_rack.rack import Orchestrator, PluginSlot
 
 
-def _serialize_control(ctrl: ControlPort) -> dict:
+def _serialize_control(ctrl: PortControl) -> dict:
     """Serialize a ControlPort to dict for JSON."""
     return {
         "symbol": ctrl.symbol,
@@ -40,7 +40,7 @@ def _serialize_control(ctrl: ControlPort) -> dict:
         "scale_points": [
             {"value": sp.value, "label": sp.label} for sp in ctrl.scale_points
         ],
-        "properties": ctrl.properties.name if ctrl.properties else "NONE",
+        "properties": ctrl.properties,
         "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label}
         if ctrl.units
         else None,

@@ -80,35 +80,35 @@ class PluginSlot:
 
     @property
     def audio_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_inputs]
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.audio_inputs]
 
     @property
     def audio_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_outputs]
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.audio_outputs]
 
     @property
     def midi_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_inputs]
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.midi_inputs]
 
     @property
     def midi_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_outputs]
-    
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.midi_outputs]
+
     @property
     def cv_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_inputs]
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.cv_inputs]
 
     @property
     def cv_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_outputs]
+        return [f"{self.label}/{p.symbol}" for p in self.plugin.cv_outputs]
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.plugin.join_audio_outputs
+    def join_outputs(self) -> bool:
+        return self.plugin.join_outputs
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return self.plugin.join_audio_inputs
+    def join_inputs(self) -> bool:
+        return self.plugin.join_inputs
 
     @property
     def size(self) -> tuple[int, int]:
@@ -147,6 +147,8 @@ class HardwareSlot:
         direction: PortDirection,
         config: HardwareConfig,
     ):
+        # self._ports: Ports = Ports()
+
         # Використовуємо звичайні атрибути, щоб вони були доступні відразу
         self.audio_ports: list[str] = []
         self.midi_ports: list[str] = []
@@ -156,10 +158,10 @@ class HardwareSlot:
 
         # Налаштування з конфігу
         if direction == PortDirection.INPUT:
-            self.join_audio_ports = config.join_audio_inputs
+            self.join_ports = config.join_inputs
             self.label = "hw_in"
         else:
-            self.join_audio_ports = config.join_audio_outputs
+            self.join_ports = config.join_outputs
             self.label = "hw_out"
 
     @property
@@ -195,12 +197,12 @@ class HardwareSlot:
         return self.midi_ports if self.direction == PortDirection.INPUT else []
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return False if self.direction == PortDirection.INPUT else self.join_audio_ports
+    def join_inputs(self) -> bool:
+        return False if self.direction == PortDirection.INPUT else self.join_ports
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.join_audio_ports if self.direction == PortDirection.INPUT else False
+    def join_outputs(self) -> bool:
+        return self.join_ports if self.direction == PortDirection.INPUT else False
 
     def __repr__(self):
         return (
@@ -444,6 +446,28 @@ class RoutingManager:
     """
 
     @classmethod
+    def _grouped_pairs(
+        cls, outputs: list[str], inputs: list[str]
+    ) -> list[tuple[str, str]]:
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        pairs = []
+
+        if n_out >= n_in:
+            # багато виходів → групуємо на входи
+            for o_idx, out in enumerate(outputs):
+                i_idx = int(o_idx * n_in / n_out)
+                pairs.append((out, inputs[i_idx]))
+        else:
+            # багато входів → групуємо на виходи
+            for i_idx, inp in enumerate(inputs):
+                o_idx = int(i_idx * n_out / n_in)
+                pairs.append((outputs[o_idx], inp))
+
+        return pairs
+
+    @classmethod
     def get_connection_pairs(
         cls,
         inputs: list[str],
@@ -454,6 +478,15 @@ class RoutingManager:
         if not outputs or not inputs:
             return []
 
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        # --- AUTO JOIN RULE ---
+        # If parity mismatches (odd ↔ even), force join
+        if (n_out % 2) != (n_in % 2):
+            join_inputs = True
+            join_outputs = True
+
         connections = []
 
         if join_inputs or join_outputs:
@@ -462,15 +495,16 @@ class RoutingManager:
                 for inp in inputs:
                     connections.append((out, inp))
         else:
-            # Pair-by-index: 1-1, 2-2, а надлишок до останнього
-            for i, out in enumerate(outputs):
-                in_idx = min(i, len(inputs) - 1)
-                connections.append((out, inputs[in_idx]))
+            # # Pair-by-index: 1-1, 2-2, а надлишок до останнього
+            # for i, out in enumerate(outputs):
+            #     in_idx = min(i, len(inputs) - 1)
+            #     connections.append((out, inputs[in_idx]))
 
-            if len(inputs) > len(outputs):
-                last_out = outputs[-1]
-                for inp in inputs[len(outputs) :]:
-                    connections.append((last_out, inp))
+            # if len(inputs) > len(outputs):
+            #     last_out = outputs[-1]
+            #     for inp in inputs[len(outputs) :]:
+            #         connections.append((last_out, inp))
+            connections.extend(cls._grouped_pairs(outputs, inputs))
 
         return connections
 
@@ -483,8 +517,8 @@ class RoutingManager:
         inputs = dst.audio_inputs
 
         # Визначаємо прапори об'єднання (join)
-        join_outputs = src.join_audio_outputs
-        join_inputs = dst.join_audio_inputs
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
@@ -496,8 +530,8 @@ class RoutingManager:
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
         # Визначаємо прапори об'єднання (join)
-        join_outputs = True  # src.join_midi_outputs
-        join_inputs = True  # dst.join_midi_inputs
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
@@ -510,8 +544,8 @@ class RoutingManager:
         inputs = dst.cv_inputs
 
         # Визначаємо прапори об'єднання (join)
-        join_outputs = True
-        join_inputs = True
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
@@ -820,48 +854,70 @@ class Orchestrator:
         Handle hardware port added via WebSocket feedback.
         Updates hardware slots.
         """
-        _Color.blue(f"+ HW {event.port_type.name} {event.direction.name}: {event.name}")
+        _Color.blue(
+            f"+ HW {event.port_type.name} "
+            f"{event.direction.name}: "
+            f"{event.symbol}, {event.name}, {event.index}"
+        )
 
-        if event.port_type not in {PortType.AUDIO, PortType.MIDI, PortType.CV}:
-            return
+        match event.direction:
+            case PortDirection.OUTPUT:
+                slot = self.output_slot
+            case PortDirection.INPUT:
+                slot = self.input_slot
+            case _:
+                return
 
-        if event.direction not in {PortDirection.INPUT, PortDirection.OUTPUT}:
-            return
+        match event.port_type:
+            case PortType.AUDIO:
+                # pgroup = slot._ports.audio
+                ports_list = slot.audio_ports
+            case PortType.MIDI:
+                # pgroup = slot._ports.midi
+                ports_list = slot.midi_ports
+            case PortType.CV:
+                # pgroup = slot._ports.cv
+                ports_list = slot.cv_ports
+            case _:
+                return
 
-        hw_config = self.config.hardware
+        disable_ports = self.config.hardware.disable_ports
 
-        if event.direction == PortDirection.OUTPUT:
-            slot = self.output_slot
-        else:
-            slot = self.input_slot
+        if event.symbol not in disable_ports:
+            if event.symbol not in ports_list:
+                ports_list.append(event.symbol)
 
-        if event.port_type == PortType.AUDIO:
-            ports_list = slot.audio_ports
-        elif event.port_type == PortType.MIDI:
-            ports_list = slot.midi_ports
-        elif event.port_type == PortType.CV:
-            ports_list = slot.cv_ports
+                # match event.direction:
+                #     case PortDirection.OUTPUT:
+                #         plist = pgroup.output
+                #     case PortDirection.INPUT:
+                #         plist = pgroup.input
+                #     case _:
+                #         return
 
-        if event.name not in hw_config.disable_ports:
-            if event.name not in ports_list:
-                ports_list.append(event.name)
+                # port = Port(
+                #     symbol=event.symbol,
+                #     name=event.name,
+                #     index=event.index,
+                # )
+                # plist.insert(event.index, port)
 
         self._schedule_reorder()
 
     def _on_graph_hw_port_remove(self, event: GraphRemoveHwPortEvent):
         """Handle hardware port removal via WebSocket feedback."""
-        _Color.red(f"- HW port: {event.name}")
+        _Color.red(f"- HW port: {event.symbol}")
 
         # Event only has name, no type/direction — search in both slots and both lists
         for slot in (self.input_slot, self.output_slot):
-            if event.name in slot.audio_ports:
-                slot.audio_ports.remove(event.name)
+            if event.symbol in slot.audio_ports:
+                slot.audio_ports.remove(event.symbol)
                 break
-            if event.name in slot.midi_ports:
-                slot.midi_ports.remove(event.name)
+            if event.symbol in slot.midi_ports:
+                slot.midi_ports.remove(event.symbol)
                 break
-            if event.name in slot.cv_ports:
-                slot.cv_ports.remove(event.name)
+            if event.symbol in slot.cv_ports:
+                slot.cv_ports.remove(event.symbol)
                 break
 
         self._schedule_reorder()

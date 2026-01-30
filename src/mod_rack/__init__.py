@@ -5,9 +5,6 @@ from .client import (
     Client,
     WsClient,
     WsConnection,
-    PortDirection,
-    PortType,
-    Port,
     WsEvent,
     WsProtocol,
     GraphAddHwPortEvent,
@@ -38,14 +35,48 @@ from .rack import (
 )
 from .plugin import Plugin
 from .controls import (
-    ControlPort,
-    ControlProperties,
-    ScalePoint,
-    Units,
+    PortControl,
     parse_control_ports,
+)
+from .schema.effect import (
+    PortType,
+    PortDirection,
+    Stability,
+    Author,
+    GuiPort,
+    Gui,
+    Ranges,
+    Units,
+    ScalePoint,
+    ControlProperty,
+    Port,
+    PortGroup,
+    Ports,
+    ParameterRanges,
+    Parameter,
+    Preset,
+    Effect,
 )
 
 __all__ = [
+    # Effect
+    "PortType",
+    "PortDirection",
+    "Stability",
+    "Author",
+    "GuiPort",
+    "Gui",
+    "Ranges",
+    "Units",
+    "ScalePoint",
+    "ControlProperty",
+    "Port",
+    "PortGroup",
+    "Ports",
+    "ParameterRanges",
+    "Parameter",
+    "Preset",
+    "Effect",
     # Config
     "PluginConfig",
     "HardwareConfig",
@@ -58,9 +89,6 @@ __all__ = [
     "WsConnection",
     "WsProtocol",
     "WsClient",
-    # Client:Port
-    "PortType",
-    "PortDirection",
     # Client:Generic
     "WsEvent",
     "EventCallBack",
@@ -100,11 +128,7 @@ __all__ = [
     "OrchestratorMode",
     # Plugin
     "Plugin",
-    "Port",
     # Controls
-    "ControlProperties",
-    "ScalePoint",
-    "Units",
-    "ControlPort",
+    "PortControl",
     "parse_control_ports",
 ]

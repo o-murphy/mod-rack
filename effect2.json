@@ -1,0 +1,723 @@
+{
+    "valid": true,
+    "uri": "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic",
+    "name": "AIDA-X",
+    "binary": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/rt-neural-generic.so",
+    "brand": "Aida DSP",
+    "label": "AIDA-X",
+    "license": "http://opensource.org/license/gpl-3-0",
+    "comment": "\nAIDA-X is an Amp Model Player, allowing it to load models of AI trained music gear, which you can then play through!\n\nIts main intended use is to provide high fidelity simulations of amplifiers.\nHowever, it is also possible to run entire signal chains consisting of any combination of amp, cab, dist, drive, fuzz, boost and eq.\n",
+    "buildEnvironment": "",
+    "category": [
+        "Simulator"
+    ],
+    "microVersion": 1,
+    "minorVersion": 1,
+    "release": 0,
+    "builder": 0,
+    "licensed": 0,
+    "iotype": 1,
+    "hasExternalUI": false,
+    "version": "1.1",
+    "stability": "testing",
+    "author": {
+        "name": "Aida DSP",
+        "homepage": "http://aidadsp.cc",
+        "email": ""
+    },
+    "bundles": [
+        "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/"
+    ],
+    "gui": {
+        "resourcesDirectory": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui",
+        "iconTemplate": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/icon-rt-neural-generic.html",
+        "settingsTemplate": "",
+        "javascript": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/javascript-rt-neural-generic.js",
+        "stylesheet": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/stylesheet-rt-neural-generic.css",
+        "screenshot": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/screenshot-rt-neural-generic.png",
+        "thumbnail": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/thumbnail-rt-neural-generic.png",
+        "discussionURL": "https://forum.mod.audio/t/aida-dsp-aida-x/9639",
+        "documentation": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/modgui/aida-x-manual.pdf",
+        "brand": "Aida DSP",
+        "label": "rt-neural-gen",
+        "model": "",
+        "panel": "",
+        "color": "",
+        "knob": "",
+        "ports": [
+            {
+                "valid": true,
+                "index": 0,
+                "name": "INPUT",
+                "symbol": "PREGAIN"
+            },
+            {
+                "valid": true,
+                "index": 1,
+                "name": "BASS",
+                "symbol": "BASS"
+            },
+            {
+                "valid": true,
+                "index": 2,
+                "name": "TREBLE",
+                "symbol": "TREBLE"
+            },
+            {
+                "valid": true,
+                "index": 3,
+                "name": "OUTPUT",
+                "symbol": "MASTER"
+            }
+        ],
+        "monitoredOutputs": [
+            "ModelInSize"
+        ]
+    },
+    "ports": {
+        "audio": {
+            "input": [
+                {
+                    "valid": true,
+                    "index": 0,
+                    "name": "IN",
+                    "symbol": "IN",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 0.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "IN"
+                }
+            ],
+            "output": [
+                {
+                    "valid": true,
+                    "index": 1,
+                    "name": "OUT",
+                    "symbol": "OUT",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 0.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "OUT"
+                }
+            ]
+        },
+        "control": {
+            "input": [
+                {
+                    "valid": true,
+                    "index": 4,
+                    "name": "ANTIALIASING",
+                    "symbol": "ANTIALIASING",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 100.0,
+                        "default": 66.21600341796875
+                    },
+                    "units": {
+                        "label": "percent",
+                        "render": "%f%%",
+                        "symbol": "%",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [
+                        {
+                            "valid": true,
+                            "value": 0.0,
+                            "label": "Off"
+                        }
+                    ],
+                    "shortName": "ANTIALIASING"
+                },
+                {
+                    "valid": true,
+                    "index": 5,
+                    "name": "INPUT",
+                    "symbol": "PREGAIN",
+                    "ranges": {
+                        "minimum": -12.0,
+                        "maximum": 12.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "INPUT"
+                },
+                {
+                    "valid": true,
+                    "index": 6,
+                    "name": "NETBYPASS",
+                    "symbol": "NETBYPASS",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "integer",
+                        "toggled"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "NETBYPASS"
+                },
+                {
+                    "valid": true,
+                    "index": 7,
+                    "name": "PARAM1",
+                    "symbol": "PARAM1",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "PARAM1"
+                },
+                {
+                    "valid": true,
+                    "index": 8,
+                    "name": "PARAM2",
+                    "symbol": "PARAM2",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "PARAM2"
+                },
+                {
+                    "valid": true,
+                    "index": 9,
+                    "name": "EQBYPASS",
+                    "symbol": "EQBYPASS",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "integer",
+                        "toggled"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "EQBYPASS"
+                },
+                {
+                    "valid": true,
+                    "index": 10,
+                    "name": "EQPOS",
+                    "symbol": "EQPOS",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "enumeration",
+                        "integer"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [
+                        {
+                            "valid": true,
+                            "value": 0.0,
+                            "label": "POST"
+                        },
+                        {
+                            "valid": true,
+                            "value": 1.0,
+                            "label": "PRE"
+                        }
+                    ],
+                    "shortName": "EQPOS"
+                },
+                {
+                    "valid": true,
+                    "index": 11,
+                    "name": "BASS",
+                    "symbol": "BASS",
+                    "ranges": {
+                        "minimum": -8.0,
+                        "maximum": 8.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "BASS"
+                },
+                {
+                    "valid": true,
+                    "index": 12,
+                    "name": "BFREQ",
+                    "symbol": "BFREQ",
+                    "ranges": {
+                        "minimum": 75.0,
+                        "maximum": 600.0,
+                        "default": 305.0
+                    },
+                    "units": {
+                        "label": "hertz",
+                        "render": "%f Hz",
+                        "symbol": "Hz",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "BFREQ"
+                },
+                {
+                    "valid": true,
+                    "index": 13,
+                    "name": "MID",
+                    "symbol": "MID",
+                    "ranges": {
+                        "minimum": -8.0,
+                        "maximum": 8.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "MID"
+                },
+                {
+                    "valid": true,
+                    "index": 14,
+                    "name": "MFREQ",
+                    "symbol": "MFREQ",
+                    "ranges": {
+                        "minimum": 150.0,
+                        "maximum": 5000.0,
+                        "default": 750.0
+                    },
+                    "units": {
+                        "label": "hertz",
+                        "render": "%f Hz",
+                        "symbol": "Hz",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "MFREQ"
+                },
+                {
+                    "valid": true,
+                    "index": 15,
+                    "name": "MIDQ",
+                    "symbol": "MIDQ",
+                    "ranges": {
+                        "minimum": 0.20000000298023224,
+                        "maximum": 5.0,
+                        "default": 0.7070000171661377
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "MIDQ"
+                },
+                {
+                    "valid": true,
+                    "index": 16,
+                    "name": "MTYPE",
+                    "symbol": "MTYPE",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "enumeration",
+                        "integer"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [
+                        {
+                            "valid": true,
+                            "value": 0.0,
+                            "label": "PEAK"
+                        },
+                        {
+                            "valid": true,
+                            "value": 1.0,
+                            "label": "BANDPASS"
+                        }
+                    ],
+                    "shortName": "MTYPE"
+                },
+                {
+                    "valid": true,
+                    "index": 17,
+                    "name": "TREBLE",
+                    "symbol": "TREBLE",
+                    "ranges": {
+                        "minimum": -8.0,
+                        "maximum": 8.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "TREBLE"
+                },
+                {
+                    "valid": true,
+                    "index": 18,
+                    "name": "TFREQ",
+                    "symbol": "TFREQ",
+                    "ranges": {
+                        "minimum": 1000.0,
+                        "maximum": 4000.0,
+                        "default": 2000.0
+                    },
+                    "units": {
+                        "label": "hertz",
+                        "render": "%f Hz",
+                        "symbol": "Hz",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "TFREQ"
+                },
+                {
+                    "valid": true,
+                    "index": 19,
+                    "name": "DEPTH",
+                    "symbol": "DEPTH",
+                    "ranges": {
+                        "minimum": -8.0,
+                        "maximum": 8.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "DEPTH"
+                },
+                {
+                    "valid": true,
+                    "index": 20,
+                    "name": "PRESENCE",
+                    "symbol": "PRESENCE",
+                    "ranges": {
+                        "minimum": -8.0,
+                        "maximum": 8.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "PRESENCE"
+                },
+                {
+                    "valid": true,
+                    "index": 21,
+                    "name": "DCBLOCKER",
+                    "symbol": "DCBLOCKER",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 1.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "integer",
+                        "toggled"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "DCBLOCKER"
+                },
+                {
+                    "valid": true,
+                    "index": 22,
+                    "name": "OUTPUT",
+                    "symbol": "MASTER",
+                    "ranges": {
+                        "minimum": -15.0,
+                        "maximum": 15.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "decibels",
+                        "render": "%f dB",
+                        "symbol": "dB",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "OUTPUT"
+                },
+                {
+                    "valid": true,
+                    "index": 24,
+                    "name": "Enabled",
+                    "symbol": "enabled",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "default": 1.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "http://lv2plug.in/ns/lv2core#enabled",
+                    "properties": [],
+                    "rangeSteps": 0,
+                    "scalePoints": [],
+                    "shortName": "Enabled"
+                }
+            ],
+            "output": [
+                {
+                    "valid": true,
+                    "index": 23,
+                    "name": "Model Input Size",
+                    "symbol": "ModelInSize",
+                    "ranges": {
+                        "minimum": 0.0,
+                        "maximum": 3.0,
+                        "default": 0.0
+                    },
+                    "units": {
+                        "label": "",
+                        "render": "",
+                        "symbol": "",
+                        "_custom": false
+                    },
+                    "comment": "",
+                    "designation": "",
+                    "properties": [
+                        "enumeration",
+                        "integer"
+                    ],
+                    "rangeSteps": 0,
+                    "scalePoints": [
+                        {
+                            "valid": true,
+                            "value": 0.0,
+                            "label": "ERROR"
+                        },
+                        {
+                            "valid": true,
+                            "value": 1.0,
+                            "label": "SNAPSHOT"
+                        },
+                        {
+                            "valid": true,
+                            "value": 2.0,
+                            "label": "WITH 1 PARAM"
+                        },
+                        {
+                            "valid": true,
+                            "value": 3.0,
+                            "label": "WITH 2 PARAMS"
+                        }
+                    ],
+                    "shortName": "Model Input Size"
+                }
+            ]
+        },
+        "cv": {
+            "input": [],
+            "output": []
+        },
+        "midi": {
+            "input": [],
+            "output": []
+        }
+    },
+    "parameters": [
+        {
+            "valid": true,
+            "readable": false,
+            "writable": true,
+            "uri": "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic#json",
+            "label": "Neural Model",
+            "type": "http://lv2plug.in/ns/ext/atom#Path",
+            "ranges": {
+                "minimum": "",
+                "maximum": "",
+                "default": "/home/murphy/mod-desktop/mod-desktop/plugins/rt-neural-generic.lv2/models/deer ink studios/tw40_california_clean_deerinkstudios.json"
+            },
+            "units": {
+                "label": "",
+                "render": "",
+                "symbol": "",
+                "_custom": false
+            },
+            "comment": "",
+            "shortName": "Neural Model",
+            "fileTypes": [
+                "aidadspmodel"
+            ],
+            "supportedExtensions": []
+        }
+    ],
+    "presets": []
+}
