@@ -65,13 +65,16 @@ class Plugin:
         self.cv_inputs: list[Port] = []
         self.cv_outputs: list[Port] = []
 
+        self.ports: dict[PortType, list[Port | ControlPort]] = {
+            PortType.AUDIO: [],
+            PortType.MIDI: [],
+            PortType.CV: [],
+            PortType.CONTROL: [],
+        }
+
         # configuration
-        self.join_inputs: bool = (
-            config.join_inputs if config is not None else False
-        )
-        self.join_outputs: bool = (
-            config.join_outputs if config is not None else False
-        )
+        self.join_inputs: bool = config.join_inputs if config is not None else False
+        self.join_outputs: bool = config.join_outputs if config is not None else False
 
         self._effect_data: dict = self.client.effect_get(self.uri)
         self.name = self._effect_data.get("name", self.label)
@@ -118,6 +121,51 @@ class Plugin:
         )
         return plugin
 
+    def _load_plugin_ports2(self, filter_gui_controls: bool = False) -> None:
+        ports_info: dict[str, dict] = self._effect_data.get("ports", {})
+        label = self.label
+
+        def _get_by_type(pt_str_: str, dir: str):
+            ports_ = ports_info.get(pt_str, [])
+
+            found_ports = []
+            for p in ports_:
+                if pt_str == "control":
+                    if filter_gui_controls and "notOnGUI" in p.get("properties", []):
+                        continue
+                    found_ports.append(
+                        ControlPort.from_dict(
+                            p,
+                            graph_path=f"{label}/{p['symbol']}",
+                            port_type=PortType.CONTROL,
+                            direction=PortDirection.INPUT,
+                        )
+                    )
+                else:
+                    Port(
+                        symbol=p["symbol"],
+                        name=p.get("name", p["symbol"]),
+                        graph_path=f"{label}/{p['symbol']}",
+                        port_type=PortType(pt_str_),
+                        direction=PortDirection.INPUT
+                        if dir == "input"
+                        else PortDirection.OUTPUT,
+                    )
+
+            return found_ports
+
+        for pt_str in ["audio", "midi", "cv", "control"]:
+            try:
+                pt = PortType(pt_str)
+                # Завантажуємо і вхідні, і вихідні порти для цього типу
+                inputs = _get_by_type(pt_str, "input")
+                outputs = _get_by_type(pt_str, "output")
+
+                # Зберігаємо в загальний список або словник
+                self.ports[pt] = inputs + outputs
+            except ValueError as err:
+                print(f"Can't parse PortType: {err}")
+
     def _load_plugin_ports(self, filter_gui_controls: bool = False) -> None:
         """Load and filter plugin ports from effect data.
         Load control metadata from effect_get response.
@@ -141,7 +189,7 @@ class Plugin:
                 ports_: dict = ports[port_type]
             except KeyError:
                 return []
-            
+
             found = []
             for p in ports_.get(direction, []):
                 if config is not None and p["symbol"] in config.disable_ports:
