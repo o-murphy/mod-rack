@@ -301,7 +301,7 @@ def parse_control_ports(
         return [
             control
             for control in controls_list
-            if "notOnGUI" not in control.get("properties")
+            if "notOnGUI" not in control.get("properties", [])
         ]
 
     if filter_gui_controls:
