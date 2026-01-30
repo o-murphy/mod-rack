@@ -278,7 +278,9 @@ class ControlPort:
         )
 
 
-def parse_control_ports(effect_data: dict[str, Any]) -> list[ControlPort]:
+def parse_control_ports(
+    effect_data: dict[str, Any], *, filter_gui_controls: bool = True
+) -> list[ControlPort]:
     """
     Parse all control input ports from effect_get response.
 
@@ -292,6 +294,17 @@ def parse_control_ports(effect_data: dict[str, Any]) -> list[ControlPort]:
     control_ports = ports.get("control", {})
     inputs = control_ports.get("input", [])
     outputs = control_ports.get("output", [])
+
+    def _filter_gui_controls(controls_list):
+        return [
+            control
+            for control in controls_list
+            if "notOnGUI" not in control.get("properties")
+        ]
+
+    if filter_gui_controls:
+        inputs = _filter_gui_controls(inputs)
+        outputs = _filter_gui_controls(outputs)
 
     controls = []
 

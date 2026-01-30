@@ -27,7 +27,7 @@ url = "{url}"
 
 [rack]
 routing_mode = "{routing_mode}"  # one of [hard_bypass, linear, dual_track], default=hard_bypass
-
+filter_gui_controls = true
 
 ###################
 # --- Plugins --- #
