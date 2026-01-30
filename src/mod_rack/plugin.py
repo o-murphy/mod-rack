@@ -55,22 +55,15 @@ class Plugin:
         self._config = (
             config if config is not None else PluginConfig(self.label, self.uri)
         )
-        self._controls: dict[str, ControlPort] = {}
 
         # io setup
-        self.audio_inputs: list[Port] = []
-        self.audio_outputs: list[Port] = []
-        self.midi_inputs: list[Port] = []
-        self.midi_outputs: list[Port] = []
-        self.cv_inputs: list[Port] = []
-        self.cv_outputs: list[Port] = []
-
         self.ports: dict[PortType, list[Port | ControlPort]] = {
             PortType.AUDIO: [],
             PortType.MIDI: [],
             PortType.CV: [],
             PortType.CONTROL: [],
         }
+        self._controls: dict[str, ControlPort] = {}
 
         # configuration
         self.join_inputs: bool = config.join_inputs if config is not None else False
@@ -121,116 +114,72 @@ class Plugin:
         )
         return plugin
 
-    def _load_plugin_ports2(self, filter_gui_controls: bool = False) -> None:
-        ports_info: dict[str, dict] = self._effect_data.get("ports", {})
-        label = self.label
-
-        def _get_by_type(pt_str_: str, dir: str):
-            ports_ = ports_info.get(pt_str, [])
-
-            found_ports = []
-            for p in ports_:
-                if pt_str == "control":
-                    if filter_gui_controls and "notOnGUI" in p.get("properties", []):
-                        continue
-                    found_ports.append(
-                        ControlPort.from_dict(
-                            p,
-                            graph_path=f"{label}/{p['symbol']}",
-                            port_type=PortType.CONTROL,
-                            direction=PortDirection.INPUT,
-                        )
-                    )
-                else:
-                    Port(
-                        symbol=p["symbol"],
-                        name=p.get("name", p["symbol"]),
-                        graph_path=f"{label}/{p['symbol']}",
-                        port_type=PortType(pt_str_),
-                        direction=PortDirection.INPUT
-                        if dir == "input"
-                        else PortDirection.OUTPUT,
-                    )
-
-            return found_ports
-
-        for pt_str in ["audio", "midi", "cv", "control"]:
-            try:
-                pt = PortType(pt_str)
-                # Завантажуємо і вхідні, і вихідні порти для цього типу
-                inputs = _get_by_type(pt_str, "input")
-                outputs = _get_by_type(pt_str, "output")
-
-                # Зберігаємо в загальний список або словник
-                self.ports[pt] = inputs + outputs
-            except ValueError as err:
-                print(f"Can't parse PortType: {err}")
-
     def _load_plugin_ports(self, filter_gui_controls: bool = False) -> None:
         """Load and filter plugin ports from effect data.
         Load control metadata from effect_get response.
-
-        Args:
-            label: Plugin label for graph paths
-            effect_data: Data from effect_get API
-
-        Returns:
-            Tuple of (inputs, outputs) Port lists
         """
-        # Parse all ports from effect data
-
-        ports: dict[str, dict] = self._effect_data.get("ports", {})
-
-        config = self._config
+        ports_info: dict[str, dict] = self._effect_data.get("ports", {})
         label = self.label
 
-        def _get_ports(port_type: str, direction: str):
-            try:
-                ports_: dict = ports[port_type]
-            except KeyError:
-                return []
+        def _get_by_type(pt_str: str, direction_str: str):
+            # Отримуємо список портів з JSON: ports_info['audio']['input'] і т.д.
+            type_data = ports_info.get(pt_str, {})
+            raw_ports = type_data.get(direction_str, [])
 
-            found = []
-            for p in ports_.get(direction, []):
-                if config is not None and p["symbol"] in config.disable_ports:
+            found_ports = []
+            for p in raw_ports:
+                # Перевірка на відключені порти в конфігу (як у вашому оригіналі)
+                if self._config and p["symbol"] in self._config.disable_ports:
                     continue
-                try:
-                    found.append(
+
+                graph_path = f"{label}/{p['symbol']}"
+
+                if pt_str == "control":
+                    # Спеціальна обробка для ControlPort
+                    if filter_gui_controls and "notOnGUI" in p.get("properties", []):
+                        continue
+
+                    # Використовуємо існуючу функцію parse_control_ports або direct ініціалізацію
+                    ctrl = ControlPort.from_dict(
+                        p,
+                        graph_path=graph_path,
+                        port_type=PortType.CONTROL,
+                        direction=PortDirection.INPUT
+                        if direction_str == "input"
+                        else PortDirection.OUTPUT,
+                    )
+                    found_ports.append(ctrl)
+                else:
+                    # Звичайні Audio/MIDI/CV порти
+                    found_ports.append(
                         Port(
                             symbol=p["symbol"],
                             name=p.get("name", p["symbol"]),
-                            graph_path=f"{label}/{p['symbol']}",
-                            port_type=PortType(port_type),
+                            graph_path=graph_path,
+                            port_type=PortType(pt_str),
                             direction=PortDirection.INPUT
-                            if direction == "input"
+                            if direction_str == "input"
                             else PortDirection.OUTPUT,
                         )
                     )
-                except ValueError as err:
-                    print(f"Can't parse port_type or directio: {err}")
-            return found
+            return found_ports
 
-        self.audio_inputs = _get_ports("audio", "input")
-        self.audio_outputs = _get_ports("audio", "output")
-        self.midi_inputs = _get_ports("midi", "input")
-        self.midi_outputs = _get_ports("midi", "output")
-        self.cv_inputs = _get_ports("cv", "input")
-        self.cv_outputs = _get_ports("cv", "output")
+        # Проходимо по всіх типах портів
+        for pt_name in ["audio", "midi", "cv", "control"]:
+            try:
+                pt_enum = PortType(pt_name)
+                inputs = _get_by_type(pt_name, "input")
+                outputs = _get_by_type(pt_name, "output")
 
-        print(
-            f"Parsed audio ports: inputs={self.audio_inputs}, outputs={self.audio_outputs}"
-        )
-        print(
-            f"Parsed midi ports: inputs={self.midi_inputs}, outputs={self.midi_outputs}"
-        )
-        print(f"Parsed cv ports: inputs={self.cv_inputs}, outputs={self.cv_outputs}")
+                # Зберігаємо все в один словник
+                self.ports[pt_enum] = inputs + outputs
 
-        controls = parse_control_ports(
-            self.label, self._effect_data, filter_gui_controls=filter_gui_controls
-        )
-        self._controls = {c.symbol: c for c in controls}
+                # # Якщо це контролі, також оновлюємо self._controls для швидкого доступу за символом
+                if pt_enum == PortType.CONTROL:
+                    self._controls = {c.symbol: c for c in inputs}
 
-        print(f"Parsed controls: {self._controls}")
+            except ValueError as err:
+                print(f"Skipping unknown port type {pt_name}: {err}")
 
     # --- Dict-like access to control values ---
 

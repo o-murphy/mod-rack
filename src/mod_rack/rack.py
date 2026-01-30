@@ -80,27 +80,33 @@ class PluginSlot:
 
     @property
     def audio_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_inputs]
+        # return [p.graph_path for p in self.plugin.audio_inputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.AUDIO] if p.direction is PortDirection.INPUT]
 
     @property
     def audio_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_outputs]
+        # return [p.graph_path for p in self.plugin.audio_outputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.AUDIO] if p.direction is PortDirection.OUTPUT]
 
     @property
     def midi_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_inputs]
+        # return [p.graph_path for p in self.plugin.midi_inputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.MIDI] if p.direction is PortDirection.INPUT]
 
     @property
     def midi_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_outputs]
-    
+        # return [p.graph_path for p in self.plugin.midi_outputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.MIDI] if p.direction is PortDirection.OUTPUT]
+
     @property
     def cv_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_inputs]
+        # return [p.graph_path for p in self.plugin.cv_inputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.CV] if p.direction is PortDirection.INPUT]
 
     @property
     def cv_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_outputs]
+        # return [p.graph_path for p in self.plugin.cv_outputs]
+        return [p.graph_path for p in self.plugin.ports[PortType.CV] if p.direction is PortDirection.OUTPUT]
 
     @property
     def join_outputs(self) -> bool:
