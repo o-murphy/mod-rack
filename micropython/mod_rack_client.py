@@ -390,9 +390,9 @@ if __name__ == "__main__":
             test_value = new_value
 
             # Poll for responses
-            time.sleep(0.1)
+            time.sleep(0.2)
             client.poll()
-            time.sleep(0.1)
+            time.sleep(0.2)
 
     except KeyboardInterrupt:
         print("Stopping...")

@@ -275,17 +275,27 @@ def main():
         "--config", "-c", help="Config", type=Path, default="config.toml"
     )
     parser.add_argument(
-        "--ws-port", "-p", type=int, default=9000, help="WebSocket server port"
+        "--rack-ws-port", "-p", 
+        type=int, 
+        nargs='?', 
+        const=9000, 
+        default=None, 
+        help="Rack WebSocket server on port (default: 9000 if flag present)"
     )
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     config = Config.load(args.config)
 
     print(f"Connecting to MOD server at {args.server}...")
     orchestrator = Orchestrator(args.server, config, OrchestratorMode.MANAGER)
-
-    ws_server = RackWSServer(orchestrator, port=args.ws_port)
-    ws_server.start()
+    
+    # Тепер логіка працює саме так, як ви хотіли:
+    if args.rack_ws_port is not None:
+        print(f"Starting Rack WebSocket server on port {args.rack_ws_port}...")
+        ws_server = RackWSServer(orchestrator, port=args.rack_ws_port)
+        ws_server.start()
+    else:
+        print("Rack WebSocket server disabled (no --ws-port flag provided).")
 
     try:
         orchestrator.run()
