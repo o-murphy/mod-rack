@@ -516,7 +516,7 @@ brand = "x42"
 uri = "http://gareus.org/oss/lv2/xfade"
 category = ["Utility", "Mixer"]
 # disable_ports = []
-join_audio_inputs = true
+# join_audio_inputs = false
 # join_audio_outputs = false
 
 [[plugins]]
@@ -1219,7 +1219,7 @@ uri = "http://moddevices.com/plugins/mod-devel/ToggleSwitch4"
 category = ["Utility"]
 # disable_ports = []
 # join_audio_inputs = false
-join_audio_outputs = true
+# join_audio_outputs = false
 
 [[plugins]]
 name = "Arpeggiator"
@@ -1308,8 +1308,8 @@ brand="MOD"
 uri="http://moddevices.com/plugins/mod-devel/mixer"
 category=["Utility"]
 # disable_ports = []
-join_audio_inputs = true
-join_audio_outputs = true
+# join_audio_inputs = false
+# join_audio_outputs = false
 
 [[plugins]]
 name="Mixer Stereo"
@@ -1317,8 +1317,8 @@ brand="MOD"
 uri="http://moddevices.com/plugins/mod-devel/mixer-stereo"
 category=["Utility"]
 # disable_ports = []
-join_audio_inputs = true
-join_audio_outputs = true
+# join_audio_inputs = false
+# join_audio_outputs = false
 
 [[plugins]]
 name="Audio to CV"

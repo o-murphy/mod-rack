@@ -444,6 +444,26 @@ class RoutingManager:
     """
 
     @classmethod
+    def _grouped_pairs(cls, outputs: list[str], inputs: list[str]) -> list[tuple[str, str]]:
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        pairs = []
+
+        if n_out >= n_in:
+            # багато виходів → групуємо на входи
+            for o_idx, out in enumerate(outputs):
+                i_idx = int(o_idx * n_in / n_out)
+                pairs.append((out, inputs[i_idx]))
+        else:
+            # багато входів → групуємо на виходи
+            for i_idx, inp in enumerate(inputs):
+                o_idx = int(i_idx * n_out / n_in)
+                pairs.append((outputs[o_idx], inp))
+
+        return pairs
+
+    @classmethod
     def get_connection_pairs(
         cls,
         inputs: list[str],
@@ -462,15 +482,16 @@ class RoutingManager:
                 for inp in inputs:
                     connections.append((out, inp))
         else:
-            # Pair-by-index: 1-1, 2-2, а надлишок до останнього
-            for i, out in enumerate(outputs):
-                in_idx = min(i, len(inputs) - 1)
-                connections.append((out, inputs[in_idx]))
+            # # Pair-by-index: 1-1, 2-2, а надлишок до останнього
+            # for i, out in enumerate(outputs):
+            #     in_idx = min(i, len(inputs) - 1)
+            #     connections.append((out, inputs[in_idx]))
 
-            if len(inputs) > len(outputs):
-                last_out = outputs[-1]
-                for inp in inputs[len(outputs) :]:
-                    connections.append((last_out, inp))
+            # if len(inputs) > len(outputs):
+            #     last_out = outputs[-1]
+            #     for inp in inputs[len(outputs) :]:
+            #         connections.append((last_out, inp))
+            connections.extend(cls._grouped_pairs(outputs, inputs))
 
         return connections
 
