@@ -93,6 +93,14 @@ class PluginSlot:
     @property
     def midi_outputs(self) -> list[str]:
         return [p.graph_path for p in self.plugin.midi_outputs]
+    
+    @property
+    def cv_inputs(self) -> list[str]:
+        return [p.graph_path for p in self.plugin.cv_inputs]
+
+    @property
+    def cv_outputs(self) -> list[str]:
+        return [p.graph_path for p in self.plugin.cv_outputs]
 
     @property
     def join_audio_outputs(self) -> bool:
@@ -498,8 +506,8 @@ class RoutingManager:
         cls, src: AnySlot, dst: AnySlot
     ) -> list[tuple[str, str]]:
         """Розраховує пари (вихід, вхід) між двома слотами."""
-        outputs = src.audio_outputs
-        inputs = dst.audio_inputs
+        outputs = src.cv_outputs
+        inputs = dst.cv_inputs
 
         # Визначаємо прапори об'єднання (join)
         join_outputs = True
@@ -594,7 +602,7 @@ class RoutingManager:
                             break
 
             # --- Робота з CV ---
-            if src.cv_ports:
+            if src.cv_outputs:
                 # Шукаємо наступний слот, у якого є хоча б один cv_input
                 for j in range(i + 1, len(chain)):
                     dst = chain[j]

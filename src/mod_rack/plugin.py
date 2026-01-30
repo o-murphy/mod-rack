@@ -175,7 +175,7 @@ class Plugin:
         print(
             f"Parsed midi ports: inputs={self.midi_inputs}, outputs={self.midi_outputs}"
         )
-        print(f"Parsed cv ports: inputs={self.cv_inputs}, outputs={self.cv_inputs}")
+        print(f"Parsed cv ports: inputs={self.cv_inputs}, outputs={self.cv_outputs}")
 
         controls = parse_control_ports(
             self.label, self._effect_data, filter_gui_controls=filter_gui_controls
