@@ -43,7 +43,6 @@ class PortControl:
     """
 
     port: Port
-    graph_path: str
     port_type: PortType
     direction: PortDirection
 
@@ -252,7 +251,6 @@ def parse_control_ports(
         [
             PortControl(
                 port_data,
-                graph_path=f"{plugin_label}/{port_data.symbol}",
                 port_type=PortType.CONTROL,
                 direction=PortDirection.INPUT,
             )
@@ -265,7 +263,6 @@ def parse_control_ports(
         [
             PortControl(
                 port_data,
-                graph_path=f"{plugin_label}/{port_data.symbol}",
                 port_type=PortType.CONTROL,
                 direction=PortDirection.OUTPUT,
             )

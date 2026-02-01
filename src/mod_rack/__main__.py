@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 import argparse
 
+from mod_rack.logger import logger
+
 
 def main():
     parser = argparse.ArgumentParser("mod-rack")
@@ -33,10 +35,10 @@ def main():
         parser.error("unknown command")
 
     if not target_script.exists():
-        print(f"Error: {target_script.name} not found in {base_path}")
+        logger.error("%s not found in %s", target_script.name, base_path)
         sys.exit(1)
 
-    print(f"--- Starting MOD Rack in {mode_name} mode ---")
+    logger.info("--- Starting MOD Rack in %s mode ---", mode_name)
 
     cmd = [sys.executable, str(target_script)] + command_args
 
@@ -45,9 +47,9 @@ def main():
     except KeyboardInterrupt:
         # Ctrl+C handling
         pass
-    except subprocess.CalledProcessError as e:
-        print(f"\nProcess finished with error code: {e.returncode}")
-        sys.exit(e.returncode)
+    except subprocess.CalledProcessError as err:
+        logger.error("Process finished with error code: %s", err)
+        sys.exit(err.returncode)
 
 
 if __name__ == "__main__":

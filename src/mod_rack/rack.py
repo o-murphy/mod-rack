@@ -1,4 +1,5 @@
 from enum import Enum, auto
+import logging
 import threading
 import time
 from typing import Any, Callable, SupportsIndex, TypeAlias
@@ -8,7 +9,7 @@ import string
 import weakref
 
 from mod_rack.config import Config, HardwareConfig, PluginConfig, RoutingMode
-from mod_rack.client import (
+from mod_rack.mod_client import (
     DEFAULT_DEBOUNCE_DELAY,
     GraphAddHwPortEvent,
     Client,
@@ -26,7 +27,11 @@ from mod_rack.client import (
     ResetConnectionsEvent,
 )
 from mod_rack.plugin import Plugin
+from mod_rack.logger import logger, ColorPrint
 
+
+_log = logger.getChild(__name__)
+_cp = ColorPrint(_log)
 
 # Type aliases for callbacks
 OnRackOrderChangeCallback = Callable[
@@ -147,8 +152,6 @@ class HardwareSlot:
         direction: PortDirection,
         config: HardwareConfig,
     ):
-        # self._ports: Ports = Ports()
-
         # Використовуємо звичайні атрибути, щоб вони були доступні відразу
         self.audio_ports: list[str] = []
         self.midi_ports: list[str] = []
@@ -160,7 +163,7 @@ class HardwareSlot:
         if direction == PortDirection.INPUT:
             self.join_ports = config.join_inputs
             self.label = "hw_in"
-        else:
+        elif direction == PortDirection.OUTPUT:
             self.join_ports = config.join_outputs
             self.label = "hw_out"
 
@@ -214,28 +217,6 @@ class HardwareSlot:
 
 
 AnySlot = HardwareSlot | PluginSlot
-
-
-class _Color:
-    @staticmethod
-    def info(msg):
-        print(f"\033[32m{msg}\033[0m")
-
-    @staticmethod
-    def blue(msg):
-        print(f"\033[34m{msg}\033[0m")
-
-    @staticmethod
-    def red(msg):
-        print(f"\033[31m{msg}\033[0m")
-
-    @staticmethod
-    def yellow(msg):
-        print(f"\033[33m{msg}\033[0m")
-
-    @staticmethod
-    def debug(msg):
-        print(f"\033[90m{msg}\033[0m")
 
 
 # =============================================================================
@@ -765,8 +746,8 @@ class Orchestrator:
         try:
             data = self.client.download_file("rack/config.toml")
             return Config.parse(data.decode())
-        except Exception as e:
-            print(f"Could not fetch config from server: {e}")
+        except Exception as err:
+            _log.error("[ORCHESTRATOR] Could not fetch config from server: %s", err)
             return None
 
     def refresh_installed_plugins(self) -> list[dict]:
@@ -825,15 +806,15 @@ class Orchestrator:
     def _on_loading_start(self, event: LoadingStartEvent):
         with self._lock:
             if not self._loading:
-                _Color.red("\u25a0 Reloading detected")
-            _Color.yellow("\u25f7 Loading start, initializing...")
+                _cp.red("\u25a0 Reloading detected")
+            _cp.yellow("\u25f7 Loading start, initializing...")
             self._loading = True
             self._normalizing = False
             self.slots.clear()
             self._connections.clear()
 
     def _on_loading_end(self, event: LoadingEndEvent):
-        _Color.info("\u25cf Loading end, monitoring...")
+        _cp.green("\u25cf Loading end, monitoring...")
         with self._lock:
             self._loading = False
         if not self._loading:
@@ -854,9 +835,9 @@ class Orchestrator:
         Handle hardware port added via WebSocket feedback.
         Updates hardware slots.
         """
-        _Color.blue(
-            f"+ HW {event.port_type.name} "
-            f"{event.direction.name}: "
+        _cp.blue(
+            f"+ HW {event.port_type} "
+            f"{event.direction}: "
             f"{event.symbol}, {event.name}, {event.index}"
         )
 
@@ -870,13 +851,10 @@ class Orchestrator:
 
         match event.port_type:
             case PortType.AUDIO:
-                # pgroup = slot._ports.audio
                 ports_list = slot.audio_ports
             case PortType.MIDI:
-                # pgroup = slot._ports.midi
                 ports_list = slot.midi_ports
             case PortType.CV:
-                # pgroup = slot._ports.cv
                 ports_list = slot.cv_ports
             case _:
                 return
@@ -885,28 +863,13 @@ class Orchestrator:
 
         if event.symbol not in disable_ports:
             if event.symbol not in ports_list:
-                ports_list.append(event.symbol)
-
-                # match event.direction:
-                #     case PortDirection.OUTPUT:
-                #         plist = pgroup.output
-                #     case PortDirection.INPUT:
-                #         plist = pgroup.input
-                #     case _:
-                #         return
-
-                # port = Port(
-                #     symbol=event.symbol,
-                #     name=event.name,
-                #     index=event.index,
-                # )
-                # plist.insert(event.index, port)
+                ports_list.insert(event.index, event.symbol)
 
         self._schedule_reorder()
 
     def _on_graph_hw_port_remove(self, event: GraphRemoveHwPortEvent):
         """Handle hardware port removal via WebSocket feedback."""
-        _Color.red(f"- HW port: {event.symbol}")
+        _cp.red(f"- HW port: {event.symbol}")
 
         # Event only has name, no type/direction — search in both slots and both lists
         for slot in (self.input_slot, self.output_slot):
@@ -927,7 +890,7 @@ class Orchestrator:
         Handle plugin added via WebSocket feedback.
         Creates Slot, fetches port info, connects to chain.
         """
-        _Color.blue(f"+ Plugin: {event.label}")
+        _cp.blue(f"+ Plugin: {event.label}")
 
         # Перевіряємо чи такий слот вже існує
         slot = self.get_slot_by_label(event.label)
@@ -942,7 +905,9 @@ class Orchestrator:
             )
 
             if not plugin:
-                _Color.red(f"Can not load plugin: {event.label}, {event.uri}")
+                _cp.red(
+                    f"Can not load plugin: {event.label}, {event.uri}", logging.WARNING
+                )
                 # Defer removal - server may not be ready yet
                 threading.Timer(
                     DEFAULT_DEBOUNCE_DELAY,
@@ -969,7 +934,7 @@ class Orchestrator:
         Handle plugin removed via WebSocket feedback.
         Updates local graph state ONLY.
         """
-        _Color.red(f"- Plugin: {event.label}")
+        _cp.red(f"- Plugin: {event.label}")
 
         slot = self.get_slot_by_label(event.label)
         if not slot:
@@ -977,28 +942,36 @@ class Orchestrator:
 
         with self._lock:
             self.slots.remove(slot)
-            print(f"  Removed slot: {event.label}")
+            _log.debug("[ORCHESTRATOR] Removed slot: %s", event.label)
 
         if not self._loading:
             self._schedule_reorder(force_emit=True)
 
     def _on_graph_connect(self, event: GraphConnectEvent):
-        _Color.blue(f"\u221e Connected: {event.src_path} \u21e2 {event.dst_path}")
+        _cp.blue(f"\u221e Connected: {event.src_path} \u21e2 {event.dst_path}")
         with self._lock:
             pair = (event.src_path, event.dst_path)
             if pair not in self._connections:
                 self._connections.add(pair)
-                print(f"[Cache] Connected: {event.src_path} -> {event.dst_path}")
+                _log.debug(
+                    "[ORCHESTRATOR] [Cache] Connected: %s -> %s",
+                    event.src_path,
+                    event.dst_path,
+                )
 
     def _on_graph_disconnect(self, event: GraphDisconnectEvent):
-        _Color.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
+        _cp.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
         with self._lock:
             pair = (event.src_path, event.dst_path)
             self._connections.discard(pair)
-            print(f"[Cache] Disconnected: {event.src_path} -> {event.dst_path}")
+            _log.debug(
+                "[ORCHESTRATOR] [Cache] Disconnected: %s -> %s",
+                event.src_path,
+                event.dst_path,
+            )
 
     def _on_position_change(self, event: GraphPluginPosEvent):
-        _Color.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
+        _cp.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
         """
         Handle position change from WebSocket.
         Updates slot position and reorders slots based on new coordinates.
@@ -1011,7 +984,7 @@ class Orchestrator:
         with self._lock:
             x, y = (event.x, event.y)
             if slot.is_pos_changed((x, y)):
-                _Color.yellow(f"\u21bb Syncing pos: {slot.label} to {(x, y)}")
+                _cp.yellow(f"\u21bb Syncing pos: {slot.label} to {(x, y)}")
                 slot.pos_x = x
                 slot.pos_y = y
 
@@ -1028,7 +1001,7 @@ class Orchestrator:
         if self.mode != OrchestratorMode.MANAGER and not force:
             return
 
-        _Color.info("\u21bb Normalization...")
+        _cp.green("\u21bb Normalization...")
         new_positions = GridLayoutManager.normalize(self.slots)
         self._request_update_positions(new_positions)
 
@@ -1039,13 +1012,13 @@ class Orchestrator:
         try:
             for slot, (x, y) in positions.items():
                 old_pos = (slot.pos_x, slot.pos_y)
-                _Color.yellow(f"\u21c5 Updating pos: {old_pos} -> {(x, y)}")
+                _cp.yellow(f"\u21c5 Updating pos: {old_pos} -> {(x, y)}")
                 if slot.is_pos_changed((x, y)):
                     slot.pos_x = x
                     slot.pos_y = y
                     self.client.effect_position(slot.label, x, y)
         except Exception as err:
-            _Color.red(f"\u21c5 Updating pos: error occured: {err}")
+            _cp.red(f"\u21c5 Updating pos: error occured: {err}", logging.ERROR)
         finally:
             with self._lock:
                 self.normalizing = False
@@ -1080,7 +1053,7 @@ class Orchestrator:
         self._reorder_timer.start()
 
     def _order_changed_emit(self):
-        _Color.info("\u21c5 Slots order changed")
+        _cp.green("\u21c5 Slots order changed")
         # then if order was changed process callbacks
         dead = set()
 
@@ -1114,6 +1087,8 @@ class Orchestrator:
             return
 
         with self._lock:
+            _cp.green("--- Calculating Connections ---")
+
             # 1. Отримуємо "ідеальний" стан від менеджера
             desired = RoutingManager.calculate_chain_connections(
                 self.slots,
@@ -1129,14 +1104,14 @@ class Orchestrator:
             if not to_connect and not to_disconnect:
                 return
 
-            _Color.info("--- Syncing Graph ---")
+            _cp.green("--- Syncing Graph ---")
             for out_p, in_p in to_connect:
                 self.client.effect_connect(out_p, in_p)
 
             for out_p, in_p in to_disconnect:
                 self.client.effect_disconnect(out_p, in_p)
 
-        print("=== RECONNECT SEAMLESS DONE ===\n")
+        _cp.green("--- Reconnect Done ---")
 
     def _connect_pair(self, src: AnySlot, dst: AnySlot):
         """Проксі-метод для точкового з'єднання (наприклад, при видаленні плагіна)."""
@@ -1157,7 +1132,10 @@ class Orchestrator:
             if not self._connections:
                 return
 
-            print(f"  Disconnecting everything: {len(self._connections)} connections")
+            _log.debug(
+                "[ORCHESTRATOR] Disconnecting everything: %s connections",
+                len(self._connections),
+            )
 
             # Копіюємо для ітерації
             current_pairs = list(self._connections)
@@ -1165,7 +1143,10 @@ class Orchestrator:
                 try:
                     self.client.effect_disconnect(out_path, in_path)
                 except Exception as e:
-                    _Color.red(f"Error disconnecting {out_path} -> {in_path}: {e}")
+                    _cp.red(
+                        f"\u22b6 Error disconnecting {out_path} -> {in_path}: {e}",
+                        logging.ERROR,
+                    )
 
     def clear(self):
         """Request removal of all plugins safely."""
@@ -1173,7 +1154,7 @@ class Orchestrator:
             if not self.slots:
                 return
 
-            _Color.info("--- Clearing Rack ---")
+            _cp.green("--- Clearing Rack ---")
 
             # 1. Зупиняємо моніторинг порядку на час масового видалення
             # (необов'язково, але корисно мати прапор масової операції)
@@ -1246,7 +1227,7 @@ class Rack(Orchestrator):
         """
         plugin_config = self.config.get_plugin_by_uri(uri)
         if not plugin_config:
-            print(f"Plugin not supported: {uri}")
+            _log.warning("[RACK] Plugin not supported: %s", uri)
             return None
 
         label = self._generate_label(uri)
@@ -1254,10 +1235,10 @@ class Rack(Orchestrator):
         result = self.client.effect_add(label, uri, x, y)
 
         if not result or not isinstance(result, dict) or not result.get("valid"):
-            print(f"REST error: Failed to add plugin {uri}")
+            _log.error("[RACK] Failed to add plugin: %s", uri)
             return None
 
-        print(f"REST OK: Requested add {label}, waiting for WS feedback")
+        _log.debug("[RACK] Requested add %s, waiting for WS feedback", label)
         return label
 
     def request_add_plugin_at(self, uri: str, insert_index: int) -> str | None:
@@ -1297,7 +1278,7 @@ class Rack(Orchestrator):
         """
         slot = self.get_slot_by_label(label)
         if not slot:
-            print(f"Plugin {label} not found locally, cannot remove")
+            _log.warning("[RACK] Plugin %s not found locally, cannot remove", label)
             return False
 
         idx = self.slots.index(slot)
@@ -1314,15 +1295,17 @@ class Rack(Orchestrator):
 
         # Pre-connect neighbors
         if src and dst:
-            print(f"Pre-connecting neighbors before removal: {src} -> {dst}")
+            _log.debug(
+                "[RACK] Pre-connecting neighbors before removal: %s -> %s", src, dst
+            )
             self._connect_pair(src, dst)
 
         # Attempt removal
         success = self.client.effect_remove(label)
         if not success:
-            print(f"REST remove failed for {label}, doing seamless reconnect")
+            _log.debug("[RACK] Remove failed for %s, doing seamless reconnect", label)
         else:
-            print(f"REST OK: Requested remove {label}, waiting for WS feedback")
+            _log.debug("[RACK] Requested remove %s, waiting for WS feedback", label)
 
         return success
 
@@ -1343,12 +1326,12 @@ class Rack(Orchestrator):
         if from_idx == to_idx:
             return
 
-        print(f"Moving slot from idx {from_idx} to {to_idx}")
+        _log.debug("Moving slot from idx %s to %s", from_idx, to_idx)
 
         if self._loading:
             return
 
-        _Color.info("\u21c5 Reordering...")
+        _cp.green("\u21c5 Reordering...")
         new_positions = GridLayoutManager.move_slot(self.slots, from_idx, to_idx)
         self._request_update_positions(new_positions)
 

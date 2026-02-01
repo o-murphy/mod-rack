@@ -4,20 +4,20 @@ PySide6 UI for MOD Rack control.
 Run with: python qrack.py
 """
 
+import logging
 import signal
 import sys
-from pathlib import Path
 
-from mod_rack.client import (
+from mod_rack.mod_client import (
     GraphOutputSetEvent,
     GraphParamSetBypassEvent,
     GraphParamSetEvent,
 )
 from mod_rack.plugin import Plugin
-from mod_rack.service import RackWSServer
+from mod_rack.service import RackWSServer, get_argparser
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# # Add src to path
+# sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -42,9 +42,13 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
-from mod_rack import Config, Rack, PortControl, DEFAULT_SERVER_URL
-from mod_rack.client import PortDirection
+from mod_rack import Config, Rack, PortControl
+from mod_rack.mod_client import PortDirection
 from mod_rack.rack import OrchestratorMode
+from mod_rack.logger import logger
+
+
+_log = logger.getChild(__name__)
 
 
 class ControlWidget(QWidget):
@@ -392,7 +396,7 @@ class SlotWidget(QFrame):
 
     def mousePressEvent(self, event):
         # emit click and store drag start position
-        print(f"MOUSE_PRESS: label={self.slot_label_id} pos={event.pos()}")
+        _log.debug("MOUSE_PRESS: label=%s pos=%s", self.slot_label_id, event.pos())
         self.clicked.emit(self.slot_label_id)
         self._drag_start_pos = event.pos()
         super().mousePressEvent(event)
@@ -400,7 +404,7 @@ class SlotWidget(QFrame):
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self._drag_start_pos is not None:
             distance = (event.pos() - self._drag_start_pos).manhattanLength()
-            print(f"MOUSE_MOVE: label={self.slot_label_id} distance={distance}")
+            _log.debug("MOUSE_MOVE: label=%S distance=%s", self.slot_label_id, distance)
             if distance >= QApplication.startDragDistance():
                 from PySide6.QtGui import QDrag, QPixmap
                 from PySide6.QtCore import QMimeData
@@ -419,12 +423,14 @@ class SlotWidget(QFrame):
                 self.render(pix)
                 drag.setPixmap(pix)
 
-                print(f"START_DRAG: label={self.slot_label_id}")
+                _log.debug("START_DRAG: label=%s", self.slot_label_id)
                 # change cursor to closed hand while dragging
                 QApplication.setOverrideCursor(Qt.ClosedHandCursor)
                 result = drag.exec(Qt.MoveAction)
                 QApplication.restoreOverrideCursor()
-                print(f"DRAG_RESULT: label={self.slot_label_id} result={result}")
+                _log.debug(
+                    "DRAG_RESULT: label=%s result=%s", self.slot_label_id, result
+                )
 
         super().mouseMoveEvent(event)
 
@@ -450,7 +456,7 @@ class SlotWidget(QFrame):
             else:
                 src_label = bytes(mime.data("application/x-slot-label")).decode("utf-8")
             # debug log
-            print(f"DROP_EVENT: src_label={src_label} dest_index={self.index}")
+            _log.debug("DROP_EVENT: src_label=%s dest_index=%s", src_label, self.index)
             # emit source label and this widget's index as destination
             self.dropped.emit(src_label, self.index)
             event.acceptProposedAction()
@@ -731,17 +737,17 @@ class MainWindow(QMainWindow):
                 dialog.selected_uri, len(self.rack.slots)
             )
             if label:
-                print(f"Requested add plugin, label={label}")
+                _log.debug("Requested add plugin, label=%s", label)
             else:
-                print("Failed to request add plugin")
+                _log.debug("Failed to request add plugin")
 
     def _on_remove_plugin(self, label: str):
         """Remove plugin (request via REST, wait for WS feedback)."""
         success = self.rack.request_remove_plugin(label)
         if success:
-            print(f"Requested remove plugin {label}")
+            _log.debug("Requested remove plugin %s", label)
         else:
-            print(f"Failed to request remove plugin {label}")
+            _log.debug("Failed to request remove plugin %s", label)
 
     def _on_replace_plugin(self, label: str):
         """Replace plugin - remove old, add new."""
@@ -768,13 +774,13 @@ class MainWindow(QMainWindow):
 
     def _on_slot_dropped(self, src_label: str, dest_index: int):
         """Handle drag-and-drop reorder: move src slot to dest index."""
-        print(f"ON_SLOT_DROPPED: src_label={src_label} dest_index={dest_index}")
+        _log.debug("ON_SLOT_DROPPED: src_label=%s dest_index=%s", src_label, dest_index)
         src_slot = self.rack.get_slot_by_label(src_label)
         if not src_slot:
             return
         from_idx = self.rack.slots.index(src_slot)
         to_idx = dest_index
-        print(f"ON_SLOT_DROPPED: from_idx={from_idx} to_idx={to_idx}")
+        _log.debug("ON_SLOT_DROPPED: from_idx=%s to_idx=%s", from_idx, to_idx)
         if from_idx == to_idx:
             return
         # Use rack.move_slot which handles reconnect
@@ -811,58 +817,42 @@ class MainWindow(QMainWindow):
 
     def _on_rack_order_changed(self, order: list):
         """Handle order change from WebSocket - rebuild UI."""
-        print(f"UI: Order changed: {order}")
+        _log.debug("UI: Order changed: %s", order)
         self._rebuild_slot_widgets()
 
     def closeEvent(self, event):
         """Called when user closes window."""
-        print("Closing rack connection...")
+        _log.debug("Closing rack connection...")
         event.accept()
 
 
 def main():
-    import argparse
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
 
-    parser = argparse.ArgumentParser(description="MOD Rack Controller")
-    parser.add_argument(
-        "--server", "-s", default=DEFAULT_SERVER_URL, help="MOD server URL"
-    )
-    parser.add_argument(
-        "--config", "-c", help="Config", type=Path, default="config.toml"
-    )
-    parser.add_argument("--slave", help="Slave", action="store_true")
+    parser = get_argparser()
+    ns = parser.parse_args()
 
-    # Додаємо аргумент для порту WebSocket
-    parser.add_argument(
-        "--rack-ws-port",
-        "-p",
-        type=int,
-        nargs="?",
-        const=9000,
-        default=None,
-        help="Rack WebSocket server on port (default: 9000 if flag present)",
-    )
+    if ns.verbose:
+        logger.setLevel(logging.DEBUG)
 
-    args = parser.parse_args()
-    config = Config.load(args.config)
+    config = Config.load(ns.config)
 
     # ВАЖЛИВО: Переконайтеся, що RackWSServer імпортований
     # з вашого файлу ws_server.py
     # from mod_rack.ws_server import RackWSServer
 
-    print(f"Connecting to MOD server at {args.server}...")
+    logger.info(f"Connecting to MOD server at {ns.server}...")
 
     # Ви використовували назву Orchestrator у попередніх файлах
     # Якщо у вас клас називається Rack, логіка залишається такою ж
-    mode = OrchestratorMode.OBSERVER if args.slave else OrchestratorMode.MANAGER
-    rack = Rack(args.server, config, mode)
+    mode = OrchestratorMode.OBSERVER if ns.slave else OrchestratorMode.MANAGER
+    rack = Rack(ns.server, config, mode)
 
     # Запуск WebSocket сервера, якщо вказано прапорець
-    if args.rack_ws_port is not None:
-        print(f"Starting Rack WebSocket server on port {args.rack_ws_port}...")
-        ws_server = RackWSServer(rack, port=args.rack_ws_port)
+    if ns.rack_ws_port is not None:
+        logger.info("Starting Rack WebSocket server on port %s...", ns.rack_ws_port)
+        ws_server = RackWSServer(rack, port=ns.rack_ws_port)
         ws_server.start()  # Запускається у фоновому потоці
 
     # Create and run app
@@ -873,7 +863,7 @@ def main():
 
     window = MainWindow(rack)
     title = window.windowTitle()
-    window.setWindowTitle(f"{title} ({'SLAVE' if args.slave else 'MASTER'})")
+    window.setWindowTitle(f"{title} ({'SLAVE' if ns.slave else 'MASTER'})")
 
     window.show()
 

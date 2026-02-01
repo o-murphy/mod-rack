@@ -14,6 +14,8 @@ import websocket
 
 from mod_rack.schema.effect import PortDirection, PortType
 
+from mod_rack.logger import logger, truncate
+
 __all__ = [
     # Client
     "Client",
@@ -51,6 +53,8 @@ __all__ = [
     "DEFAULT_SERVER_URL",
     "DEFAULT_DEBOUNCE_DELAY",
 ]
+
+_log = logger.getChild(__name__)
 
 DEFAULT_SERVER_URL = "http://127.0.0.1:18181"
 DEFAULT_DEBOUNCE_DELAY = 0.1
@@ -348,8 +352,8 @@ class WsProtocol:
                         name=pn,
                         index=int(idx),
                     )
-                except ValueError as e:
-                    print(e)
+                except ValueError as err:
+                    _log.error("[MOD WS] Parse: %s", err)
                     return None
 
             case ["remove_hw_port", instance, *_]:
@@ -431,7 +435,7 @@ class WsProtocol:
                 return GraphOutputSetEvent(label=label, symbol=symbol, value=f_val)
 
             case [msg_type, *_]:
-                print("UnknownEvent", msg_type, message)
+                _log.warning("[MOD WS] UnknownEvent: %s", message)
                 return UnknownEvent(msg_type=msg_type, raw_message=message)
         return None
 
@@ -502,7 +506,7 @@ class WsConnection:
         try:
             if self._ws is not None and self.connected:
                 self._ws.send(message)
-            print(f"[MOD WS] >> {message}")
+                _log.debug("[MOD WS] >> %s", message)
             return True
         except Exception:
             return False
@@ -538,7 +542,9 @@ class WsConnection:
 
             # Не реконнектимось якщо помилка non-recoverable
             if not self._should_reconnect:
-                print("WS: Non-recoverable error, stopping reconnect attempts")
+                _log.error(
+                    "[MOD WS] Non-recoverable error, stopping reconnect attempts"
+                )
                 break
 
             # Exponential backoff
@@ -658,7 +664,7 @@ class WsClient:
         hostname = parsed.hostname or parsed.path.split(":")[0]
         port = parsed.port or (443 if is_secure else 18181)
         self.ws_url = f"{scheme}://{hostname}:{port}/websocket"
-        print("WS:", self.ws_url)
+        _log.info("[MOD WS] %s", self.ws_url)
 
         self._state = StateSnapshot()
 
@@ -729,12 +735,12 @@ class WsClient:
     # -------------------
     # WsConnection callbacks
     def _on_open(self):
-        print(f"Підключено до WebSocket: {self.ws_url}")
+        _log.info("[MOD WS] Connected to WebSocket: %s" % self.ws_url)
         self._state.clear()
 
     def _on_message(self, message: str):
         # Log unknown messages
-        print(f"[MOD WS] << {message}")
+        _log.debug("[MOD WS] << %s", message)
 
         event = WsProtocol.parse(message)
         if not event:
@@ -747,10 +753,10 @@ class WsClient:
         self._dispatch(event)
 
     def _on_error(self, error):
-        print(f"WS Помилка: {error}")
+        _log.error("[MOD WS] Websocket error: %s", error)
 
     def _on_close(self):
-        print("🔌 WebSocket з'єднання закрито")
+        _log.info("[MOD WS] 🔌 WebSocket connection closed")
         self._state.clear()
 
     # -------------------
@@ -798,27 +804,22 @@ class Client:
             if resp.status_code in [301, 302]:
                 location = resp.headers.get("Location", "")
                 version = unquote(location).split("v=")[-1]
-                print(f"Detected MOD Version: {version}")
+                _log.info("[MOD HTTP] Detected MOD Version: %s", version)
                 return version
-        except Exception as e:
-            print(f"Warning: Could not resolve version: {e}")
+        except Exception as err:
+            _log.warning("[MOD HTTP] Could not resolve version: %s", err)
         return "0.0.0"
 
     def _get(self, path: str, **kwargs):
         url = self.base_url + path
-        print(f"GET {url}")
-        if kwargs:
-            print(f"    params: {kwargs}")
-
+        _log.debug("[MOD HTTP] GET: %s, params=%s", url, kwargs)
         resp = requests.get(url, params=kwargs, headers=HEADERS)
         return self._parse_response(resp)
 
     def _post(self, path: str, payload: str):
         """POST request with text/plain payload."""
         url = self.base_url + path
-        print(f"POST {url}")
-        print(f"    payload: {payload}")
-
+        _log.debug("[MOD HTTP] POST: %s, payload=%s", url, payload)
         resp = requests.post(
             url, data=payload, headers={**HEADERS, "Content-Type": "text/plain"}
         )
@@ -827,7 +828,7 @@ class Client:
     def _parse_response(self, resp: requests.Response):
         """Parse response from GET or POST request."""
         if resp.status_code >= 400:
-            print(f"    ERROR: HTTP {resp.status_code}")
+            _log.error("[MOD HTTP] RESP: code=%s", resp.status_code)
             return None
 
         content_type = resp.headers.get("Content-Type", "")
@@ -841,20 +842,18 @@ class Client:
         text = resp.text.strip()
 
         if text.lower() == "true":
-            print("    OK: True")
+            _log.debug("[MOD HTTP] RESP OK: True")
             return True
         if text.lower() == "false":
-            print("    OK: False")
+            _log.debug("[MOD HTTP] RESP OK: False")
             return False
 
         try:
             data = resp.json()
-            print(f"    OK: {type(data).__name__}")
+            _log.debug("[MOD HTTP] RESP OK: %r", truncate(data))
             return data
         except (requests.exceptions.JSONDecodeError, ValueError):
-            # Якщо це не JSON, повертаємо текст або None
-            display_text = text[:50].replace("\n", " ")
-            print(f"    OK: {display_text}..." if len(text) > 50 else f"    OK: {text}")
+            _log.debug("[MOD HTTP] RESP OK: %s", truncate(text))
             return text if text else None
 
     # =========================================================================
@@ -897,11 +896,10 @@ class Client:
                 if "image/png" in content_type and len(data) >= 24:
                     try:
                         w, h = struct.unpack(">II", data[16:24])
-                        # info += f" {w}x{h}px"
                     except struct.error:
                         pass
 
-                # print(f"    OK: {info}")
+                _log.debug("[MOD HTTP] IMAGE SIZE: %sx%spx", w, h)
         finally:
             return w, h
 
@@ -942,8 +940,8 @@ class Client:
         try:
             if self.ws and self.ws.plugin_pos(label, x, y):
                 return True
-        except Exception as e:
-            print(f"  WebSocket position failed, using REST fallback: {e}")
+        except Exception as err:
+            _log.error("[MOD WS] Position failed, using REST fallback: %s", err)
 
         # Fallback to REST endpoint
         return self._get(f"/effect/position//graph/{label}/{x}/{y}")

@@ -7,6 +7,8 @@ try:
 except ImportError:
     import tomli as tomllib  # pip install tomli for Python < 3.11
 
+from mod_rack.logger import logger
+
 
 __all__ = [
     "PluginConfig",
@@ -15,6 +17,8 @@ __all__ = [
     "RackConfig",
     "Config",
 ]
+
+_log = logger.getChild(__name__)
 
 
 @dataclass
@@ -65,7 +69,7 @@ class Config:
         path = Path(path)
 
         if not path.exists():
-            print(f"Config file {path} not found, using defaults")
+            _log.warning("[CONFIG] Config file %s not found, using defaults", path)
             return cls()
 
         with open(path, "r") as fp:

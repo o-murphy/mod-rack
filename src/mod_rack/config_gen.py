@@ -1,7 +1,8 @@
 import argparse
 import json
 from pathlib import Path
-from mod_rack.client import Client
+from mod_rack.mod_client import Client
+from mod_rack.logger import logger
 
 try:
     import tomllib  # type: ignore[import-not-found]  # Python 3.11+
@@ -118,7 +119,7 @@ def main():
 
         plugins_list = client.effect_list()
 
-        print("Fetched:", len(plugins_list))
+        logger.info("Fetched plugins:", len(plugins_list))
 
         parts = [header_fmt.format(url=client.base_url, routing_mode=ns.routing_mode)]
         parsed_count = 0
@@ -147,7 +148,7 @@ def main():
         out = ns.output / "config.toml" if ns.output.is_dir() else ns.output
         out = out.with_suffix(".toml")
 
-        print("Parsed:", parsed_count)
+        logger.info("Parsed plugins:", parsed_count)
         with open(out, "w") as fp:
             fp.writelines(parts)
 

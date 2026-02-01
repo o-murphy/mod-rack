@@ -9,7 +9,7 @@ from __future__ import annotations
 from operator import attrgetter
 
 
-from mod_rack.client import (
+from mod_rack.mod_client import (
     GraphOutputSetEvent,
     GraphParamSetBypassEvent,
     Client,
@@ -19,8 +19,12 @@ from mod_rack.config import Config, PluginConfig
 from mod_rack.controls import PortControl, parse_control_ports
 
 from mod_rack.schema.effect import Effect, Port, Ports
+from mod_rack.logger import logger
 
 __all__ = ["Plugin"]
+
+
+_log = logger.getChild(__name__)
 
 
 class Plugin:
@@ -147,7 +151,7 @@ class Plugin:
         # Перевіряємо whitelist
         plugin_config = config.get_plugin_by_uri(uri)
         if not plugin_config:
-            print(f"  Plugin {uri} not in whitelist, ignoring")
+            _log.warning("[PLUGIN] Plugin not in whitelist, ignoring: %uri", uri)
             return None
 
         plugin = cls(

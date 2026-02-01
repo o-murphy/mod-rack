@@ -1,5 +1,5 @@
 from .config import Config, HardwareConfig, PluginConfig, RackConfig
-from .client import (
+from .mod_client import (
     DEFAULT_SERVER_URL,
     DEFAULT_DEBOUNCE_DELAY,
     Client,

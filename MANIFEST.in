@@ -1,2 +1,3 @@
+include src/mod_rack/py.typed
 include src/mod_rack/plugins.toml
 include src/mod_rack/config_example.toml
