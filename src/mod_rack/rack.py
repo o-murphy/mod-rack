@@ -958,6 +958,7 @@ class Orchestrator:
                     event.src_path,
                     event.dst_path,
                 )
+                self.reconnect_seamless()
 
     def _on_graph_disconnect(self, event: GraphDisconnectEvent):
         _cp.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
@@ -969,6 +970,7 @@ class Orchestrator:
                 event.src_path,
                 event.dst_path,
             )
+            self.reconnect_seamless()
 
     def _on_position_change(self, event: GraphPluginPosEvent):
         _cp.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
