@@ -1,4 +1,23 @@
-from .config import Config, HardwareConfig, PluginConfig, RackConfig
+from .schema.config import Config, HardwareConfig, PluginConfig, RackConfig
+from .schema.effect import (
+    PortType,
+    PortDirection,
+    Stability,
+    Author,
+    GuiPort,
+    Gui,
+    Ranges,
+    Units,
+    ScalePoint,
+    ControlProperty,
+    Port,
+    PortGroup,
+    Ports,
+    ParameterRanges,
+    Parameter,
+    Preset,
+    Effect,
+)
 from .mod_client import (
     DEFAULT_SERVER_URL,
     DEFAULT_DEBOUNCE_DELAY,
@@ -47,25 +66,6 @@ from .plugin import Plugin
 from .controls import (
     PortControl,
     parse_control_ports,
-)
-from .schema.effect import (
-    PortType,
-    PortDirection,
-    Stability,
-    Author,
-    GuiPort,
-    Gui,
-    Ranges,
-    Units,
-    ScalePoint,
-    ControlProperty,
-    Port,
-    PortGroup,
-    Ports,
-    ParameterRanges,
-    Parameter,
-    Preset,
-    Effect,
 )
 
 __all__ = [

@@ -1,13 +1,13 @@
-from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from pydantic import BaseModel, Field
+
+from mod_rack.logger import logger
 
 try:
     import tomllib  # type: ignore[import-not-found]  # Python 3.11+
 except ImportError:
     import tomli as tomllib  # pip install tomli for Python < 3.11
-
-from mod_rack.logger import logger
 
 
 __all__ = [
@@ -18,31 +18,30 @@ __all__ = [
     "Config",
 ]
 
+
 _log = logger.getChild(__name__)
 
 
-@dataclass
-class PluginConfig:
+class PluginConfig(BaseModel):
     name: str
     uri: str
-    category: list[str] = field(default_factory=list)
+    category: list[str] = Field(default_factory=list)
     # Optional override for ports (for mono/stereo conversion)
-    disable_ports: list[str] = field(default_factory=list)
+    disable_ports: list[str] = Field(default_factory=list)
     # All-to-all routing: connect all inputs/outputs to each other
     join_inputs: bool = False
     join_outputs: bool = False
 
 
-@dataclass
-class HardwareConfig:
+class HardwareConfig(BaseModel):
     # None = auto-detect from MOD-UI, list = override with specific ports
-    disable_ports: list[str] = field(default_factory=list)
+    disable_ports: list[str] = Field(default_factory=list)
     # All-to-all routing for hardware ports
     join_inputs: bool = False  # Join all hardware inputs to first plugin
     join_outputs: bool = False  # Join last plugin outputs to all hardware outputs
 
 
-class RoutingMode(Enum):
+class RoutingMode(str, Enum):
     LINEAR = "linear"  # Strict 1->2->3 (with risk of breaks)
     # Each output looks for nearest next input (parallelism)
     HARD_BYPASS = "hard_bypass"
@@ -50,18 +49,16 @@ class RoutingMode(Enum):
     PATCHBAY = "patchbay"  # Disable auto-routing completely
 
 
-@dataclass
-class RackConfig:
+class RackConfig(BaseModel):
     # Maximum number of slots allowed (None = unlimited)
     routing_mode: RoutingMode = RoutingMode.HARD_BYPASS
     filter_gui_controls: bool = True
 
 
-@dataclass
-class Config:
-    hardware: HardwareConfig = field(default_factory=HardwareConfig)
-    rack: RackConfig = field(default_factory=RackConfig)
-    plugins: list[PluginConfig] = field(default_factory=list)
+class Config(BaseModel):
+    hardware: HardwareConfig = Field(default_factory=HardwareConfig)
+    rack: RackConfig = Field(default_factory=RackConfig)
+    plugins: list[PluginConfig] = Field(default_factory=list)
 
     @classmethod
     def load(cls, path: str | Path = "config.toml") -> "Config":
@@ -80,44 +77,7 @@ class Config:
     @classmethod
     def parse(cls, data: str) -> "Config":
         parsed = tomllib.loads(data)
-
-        hw_data = parsed.get("hardware", {})
-        hardware = HardwareConfig(
-            disable_ports=hw_data.get("disable_ports", []),
-            join_inputs=hw_data.get("join_inputs", False),
-            join_outputs=hw_data.get("join_outputs", False),
-        )
-
-        rack_data = parsed.get("rack", {})
-        try:
-            routing_mode = RoutingMode(
-                rack_data.get("routing_mode", RoutingMode.HARD_BYPASS)
-            )
-        except ValueError:
-            routing_mode = RoutingMode.HARD_BYPASS
-        rack = RackConfig(
-            routing_mode=routing_mode,
-            filter_gui_controls=rack_data.get("filter_gui_controls", True),
-        )
-
-        plugins = []
-        for p in parsed.get("plugins", []):
-            plugins.append(
-                PluginConfig(
-                    name=p["name"],
-                    uri=p["uri"],
-                    category=p.get("category", []),
-                    disable_ports=p.get("disable_ports", []),
-                    join_inputs=p.get("join_inputs", False),
-                    join_outputs=p.get("join_outputs", False),
-                )
-            )
-
-        return cls(
-            hardware=hardware,
-            rack=rack,
-            plugins=plugins,
-        )
+        return Config.model_validate(parsed)
 
     def get_plugin_by_name(self, name: str) -> PluginConfig | None:
         """Find plugin by name (case-insensitive)"""

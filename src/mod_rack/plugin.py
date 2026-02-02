@@ -15,7 +15,7 @@ from mod_rack.mod_client import (
     Client,
     GraphParamSetEvent,
 )
-from mod_rack.config import Config, PluginConfig
+from mod_rack.schema.config import Config, PluginConfig
 from mod_rack.controls import PortControl, parse_control_ports
 
 from mod_rack.schema.effect import Effect, Port, Ports

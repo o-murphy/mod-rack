@@ -8,7 +8,7 @@ import secrets
 import string
 import weakref
 
-from mod_rack.config import Config, HardwareConfig, PluginConfig, RoutingMode
+from mod_rack.schema.config import Config, HardwareConfig, PluginConfig, RoutingMode
 from mod_rack.mod_client import (
     DEFAULT_DEBOUNCE_DELAY,
     GraphAddHwPortEvent,
@@ -35,12 +35,9 @@ _log = logger.getChild(__name__)
 _cp = ColorPrint(_log)
 
 # Type aliases for callbacks
-OnRackOrderChangeCallback = Callable[
-    [list["PluginSlot"]], None
-]  # order (list of labels)
+OnRackOrderChangeCallback = Callable[[list["PluginSlot"]], None]  # order (list of labels)
 OnRackOrderChangeCallbackRef: TypeAlias = (
-    weakref.ReferenceType[OnRackOrderChangeCallback]
-    | weakref.WeakMethod[OnRackOrderChangeCallback]
+    weakref.ReferenceType[OnRackOrderChangeCallback] | weakref.WeakMethod[OnRackOrderChangeCallback]
 )
 
 __all__ = [
@@ -256,9 +253,7 @@ class GridLayoutManager:
         return [slot for row in rows for slot in row]
 
     @classmethod
-    def normalize(
-        cls, slots: list[PluginSlot]
-    ) -> dict[PluginSlot, tuple[float, float]]:
+    def normalize(cls, slots: list[PluginSlot]) -> dict[PluginSlot, tuple[float, float]]:
         if not slots:
             return {}
 
@@ -297,9 +292,7 @@ class GridLayoutManager:
         return result
 
     @classmethod
-    def move_slot(
-        cls, slots: list[PluginSlot], from_idx: int, to_idx: int
-    ) -> dict[PluginSlot, tuple[float, float]]:
+    def move_slot(cls, slots: list[PluginSlot], from_idx: int, to_idx: int) -> dict[PluginSlot, tuple[float, float]]:
         """
         Move slot in the list and reassign existing coordinates to slots
         according to their new order.
@@ -377,9 +370,7 @@ class GridLayoutManager:
         return rows
 
     @classmethod
-    def get_insertion_coords(
-        cls, slots: list[PluginSlot], index: int | None = None
-    ) -> tuple[float, float]:
+    def get_insertion_coords(cls, slots: list[PluginSlot], index: int | None = None) -> tuple[float, float]:
         """
         Calculate coordinates based on visual rows (clusters).
         """
@@ -431,9 +422,7 @@ class RoutingManager:
     """
 
     @classmethod
-    def _grouped_pairs(
-        cls, outputs: list[str], inputs: list[str]
-    ) -> list[tuple[str, str]]:
+    def _grouped_pairs(cls, outputs: list[str], inputs: list[str]) -> list[tuple[str, str]]:
         n_out = len(outputs)
         n_in = len(inputs)
 
@@ -494,9 +483,7 @@ class RoutingManager:
         return connections
 
     @classmethod
-    def get_audio_connection_pairs(
-        cls, src: AnySlot, dst: AnySlot
-    ) -> list[tuple[str, str]]:
+    def get_audio_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
         """Calculate (output, input) pairs between two slots."""
         outputs = src.audio_outputs
         inputs = dst.audio_inputs
@@ -508,9 +495,7 @@ class RoutingManager:
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
-    def get_midi_connection_pairs(
-        cls, src: AnySlot, dst: AnySlot
-    ) -> list[tuple[str, str]]:
+    def get_midi_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
         """Calculate (output, input) pairs between two slots."""
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
@@ -521,9 +506,7 @@ class RoutingManager:
         return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
-    def get_cv_connection_pairs(
-        cls, src: AnySlot, dst: AnySlot
-    ) -> list[tuple[str, str]]:
+    def get_cv_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
         """Calculate (output, input) pairs between two slots."""
         outputs = src.cv_outputs
         inputs = dst.cv_inputs
@@ -544,17 +527,13 @@ class RoutingManager:
     ) -> set[tuple[str, str]]:
         match mode:
             case RoutingMode.HARD_BYPASS:
-                return cls._calculate_hard_bypass_connections(
-                    slots, input_slot, output_slot
-                )
+                return cls._calculate_hard_bypass_connections(slots, input_slot, output_slot)
             case RoutingMode.TRIPPLE_TRACK:
-                return cls._calculate_tripple_track_connections(
-                    slots, input_slot, output_slot
-                )
+                return cls._calculate_tripple_track_connections(slots, input_slot, output_slot)
             case RoutingMode.LINEAR:
-                return cls._calculate_tripple_track_connections(
-                    slots, input_slot, output_slot
-                )
+                return cls._calculate_tripple_track_connections(slots, input_slot, output_slot)
+            case RoutingMode.PATCHBAY:
+                return []
             case _:
                 raise ValueError("Unsupported routing mode")
 
@@ -731,12 +710,8 @@ class Orchestrator:
         self._order_change_listeners: set[OnRackOrderChangeCallbackRef] = set()
 
         # Slots and connections cache
-        self.input_slot = HardwareSlot(
-            direction=PortDirection.INPUT, config=self.config.hardware
-        )
-        self.output_slot = HardwareSlot(
-            direction=PortDirection.OUTPUT, config=self.config.hardware
-        )
+        self.input_slot = HardwareSlot(direction=PortDirection.INPUT, config=self.config.hardware)
+        self.output_slot = HardwareSlot(direction=PortDirection.OUTPUT, config=self.config.hardware)
         self.slots: list[PluginSlot] = []
         self._connections: set[tuple[str, str]] = set()
 
@@ -839,11 +814,7 @@ class Orchestrator:
         Handle hardware port added via WebSocket feedback.
         Updates hardware slots.
         """
-        _cp.blue(
-            f"+ HW {event.port_type} "
-            f"{event.direction}: "
-            f"{event.symbol}, {event.name}, {event.index}"
-        )
+        _cp.blue(f"+ HW {event.port_type} {event.direction}: {event.symbol}, {event.name}, {event.index}")
 
         match event.direction:
             case PortDirection.INPUT:
@@ -909,9 +880,7 @@ class Orchestrator:
             )
 
             if not plugin:
-                _cp.red(
-                    f"Can not load plugin: {event.label}, {event.uri}", logging.WARNING
-                )
+                _cp.red(f"Can not load plugin: {event.label}, {event.uri}", logging.WARNING)
                 # Defer removal - server may not be ready yet
                 threading.Timer(
                     DEFAULT_DEBOUNCE_DELAY,
@@ -1011,9 +980,7 @@ class Orchestrator:
         new_positions = GridLayoutManager.normalize(self.slots)
         self._request_update_positions(new_positions)
 
-    def _request_update_positions(
-        self, positions: dict[PluginSlot, tuple[float, float]]
-    ):
+    def _request_update_positions(self, positions: dict[PluginSlot, tuple[float, float]]):
         self.normalizing = True
         try:
             for slot, (x, y) in positions.items():
@@ -1301,9 +1268,7 @@ class Rack(Orchestrator):
 
         # Pre-connect neighbors
         if src and dst:
-            _log.debug(
-                "[RACK] Pre-connecting neighbors before removal: %s -> %s", src, dst
-            )
+            _log.debug("[RACK] Pre-connecting neighbors before removal: %s -> %s", src, dst)
             self._connect_pair(src, dst)
 
         # Attempt removal

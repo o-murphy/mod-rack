@@ -15,9 +15,12 @@ from mod_rack.mod_client import (
 )
 from mod_rack.plugin import Plugin
 from mod_rack.service import RackWSServer, get_argparser
-
-# # Add src to path
-# sys.path.insert(0, str(Path(__file__).parent / "src"))
+from mod_rack.schema.config import Config
+from mod_rack.rack import Rack
+from mod_rack.controls import PortControl
+from mod_rack.mod_client import PortDirection
+from mod_rack.rack import OrchestratorMode
+from mod_rack.logger import logger
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -41,11 +44,6 @@ from PySide6.QtWidgets import (
     QMenu,
 )
 from PySide6.QtCore import Qt, Signal, QTimer
-
-from mod_rack import Config, Rack, PortControl
-from mod_rack.mod_client import PortDirection
-from mod_rack.rack import OrchestratorMode
-from mod_rack.logger import logger
 
 
 _log = logger.getChild(__name__)
@@ -312,9 +310,7 @@ class PluginSelectorDialog(QDialog):
         layout.addWidget(self.list_widget)
 
         # Buttons
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -383,14 +379,10 @@ class SlotWidget(QFrame):
         menu = QMenu()
 
         replace_action = menu.addAction("Replace Plugin")
-        replace_action.triggered.connect(
-            lambda: self.replace_requested.emit(self.slot_label_id)
-        )
+        replace_action.triggered.connect(lambda: self.replace_requested.emit(self.slot_label_id))
 
         remove_action = menu.addAction("Remove Plugin")
-        remove_action.triggered.connect(
-            lambda: self.remove_requested.emit(self.slot_label_id)
-        )
+        remove_action.triggered.connect(lambda: self.remove_requested.emit(self.slot_label_id))
 
         menu.exec(self.mapToGlobal(pos))
 
@@ -412,9 +404,7 @@ class SlotWidget(QFrame):
                 drag = QDrag(self)
                 mime = QMimeData()
                 # put both custom data and plain text for robustness
-                mime.setData(
-                    "application/x-slot-label", self.slot_label_id.encode("utf-8")
-                )
+                mime.setData("application/x-slot-label", self.slot_label_id.encode("utf-8"))
                 mime.setText(self.slot_label_id)
                 drag.setMimeData(mime)
 
@@ -428,9 +418,7 @@ class SlotWidget(QFrame):
                 QApplication.setOverrideCursor(Qt.ClosedHandCursor)
                 result = drag.exec(Qt.MoveAction)
                 QApplication.restoreOverrideCursor()
-                _log.debug(
-                    "DRAG_RESULT: label=%s result=%s", self.slot_label_id, result
-                )
+                _log.debug("DRAG_RESULT: label=%s result=%s", self.slot_label_id, result)
 
         super().mouseMoveEvent(event)
 
@@ -733,9 +721,7 @@ class MainWindow(QMainWindow):
         """Add a new plugin (request via REST, wait for WS feedback)."""
         dialog = PluginSelectorDialog(self.rack, self)
         if dialog.exec() == QDialog.Accepted and dialog.selected_uri:
-            label = self.rack.request_add_plugin_at(
-                dialog.selected_uri, len(self.rack.slots)
-            )
+            label = self.rack.request_add_plugin_at(dialog.selected_uri, len(self.rack.slots))
             if label:
                 _log.debug("Requested add plugin, label=%s", label)
             else:
@@ -803,10 +789,7 @@ class MainWindow(QMainWindow):
 
     def _on_ws_param_changed(self, label: str, symbol: str, value: float):
         """Handle parameter change in main thread."""
-        if (
-            label == self.selected_label
-            and symbol in self.controls_panel.control_widgets
-        ):
+        if label == self.selected_label and symbol in self.controls_panel.control_widgets:
             widget = self.controls_panel.control_widgets[symbol]
             widget.set_value_silent(value)
 

@@ -23,6 +23,8 @@ from mod_rack.mod_client import (
     GraphParamSetEvent,
     GraphParamSetBypassEvent,
 )
+from mod_rack.schema.config import Config
+from mod_rack.rack import Orchestrator, OrchestratorMode
 from mod_rack.controls import PortControl
 from mod_rack.mod_client import DEFAULT_SERVER_URL
 from mod_rack.logger import logger
@@ -47,13 +49,9 @@ def _serialize_control(ctrl: PortControl) -> dict:
         "minimum": ctrl.minimum,
         "maximum": ctrl.maximum,
         "default": ctrl.default,
-        "scale_points": [
-            {"value": sp.value, "label": sp.label} for sp in ctrl.scale_points
-        ],
+        "scale_points": [{"value": sp.value, "label": sp.label} for sp in ctrl.scale_points],
         "properties": ctrl.properties,
-        "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label}
-        if ctrl.units
-        else None,
+        "units": {"symbol": ctrl.units.symbol, "label": ctrl.units.label} if ctrl.units else None,
         "range_steps": ctrl.range_steps,
         "value": ctrl.value,
     }
@@ -64,9 +62,7 @@ def _serialize_slot(slot: "PluginSlot") -> dict:
     return {
         "label": slot.label,
         "bypassed": slot.plugin.bypassed,
-        "controls": [
-            _serialize_control(ctrl) for ctrl in slot.plugin.controls.values()
-        ],
+        "controls": [_serialize_control(ctrl) for ctrl in slot.plugin.controls.values()],
     }
 
 
@@ -82,9 +78,7 @@ class RackWSServer:
             {"event": "order", "slots": [{label, controls: [...]}]}
     """
 
-    def __init__(
-        self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000
-    ):
+    def __init__(self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000):
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
@@ -154,9 +148,7 @@ class RackWSServer:
         if self._loop and self._clients:
             asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
 
-    def _on_control_changed(
-        self, event: GraphParamSetEvent | GraphOutputSetEvent
-    ) -> None:
+    def _on_control_changed(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
         """Called when a plugin parameter changes - broadcast to all clients."""
         _log.debug(
             "[RACK WS] param changed: %s/%s = %s",
@@ -220,9 +212,7 @@ class RackWSServer:
 
                     if cmd == "get_order":
                         slots_data = self._get_order_data()
-                        await websocket.send(
-                            json.dumps({"event": "order", "slots": slots_data})
-                        )
+                        await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
 
                     elif cmd == "set_param":
                         label = msg.get("label")
@@ -236,9 +226,7 @@ class RackWSServer:
                         self._set_bypass(label, bypassed)
 
                     else:
-                        await websocket.send(
-                            json.dumps({"error": f"unknown cmd: {cmd}"})
-                        )
+                        await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
 
                 except json.JSONDecodeError:
                     await websocket.send(json.dumps({"error": "invalid json"}))
@@ -252,9 +240,7 @@ class RackWSServer:
     async def _run_server(self) -> None:
         """Main server coroutine."""
         async with websockets.serve(self._handle_client, self.host, self.port):
-            _log.debug(
-                "[RACK WS] RackWSServer listening on ws://%s:%s", self.host, self.port
-            )
+            _log.debug("[RACK WS] RackWSServer listening on ws://%s:%s", self.host, self.port)
             await asyncio.Future()  # run forever
 
     def start(self) -> None:
@@ -279,12 +265,8 @@ def get_argparser():
     import argparse
 
     parser = argparse.ArgumentParser(description="MOD Rack WebSocket Server")
-    parser.add_argument(
-        "--server", "-s", default=DEFAULT_SERVER_URL, help="MOD server URL"
-    )
-    parser.add_argument(
-        "--config", "-c", help="Config", type=Path, default="config.toml"
-    )
+    parser.add_argument("--server", "-s", default=DEFAULT_SERVER_URL, help="MOD server URL")
+    parser.add_argument("--config", "-c", help="Config", type=Path, default="config.toml")
     parser.add_argument(
         "--rack-ws-port",
         "-p",
@@ -301,12 +283,6 @@ def get_argparser():
 
 
 def main():
-    from mod_rack.config import Config
-    from mod_rack.rack import Orchestrator, OrchestratorMode
-
-    # # Add src to path
-    # sys.path.insert(0, str(Path(__file__).parent.parent))
-
     parser = get_argparser()
     ns = parser.parse_args()
 
