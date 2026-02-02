@@ -85,27 +85,27 @@ class PluginSlot:
     
     @property
     def audio_inputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.audio_inputs]
+        return [p.graph_path for p in self.plugin.audio_inputs]
 
     @property
     def audio_outputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.audio_outputs]
+        return [p.graph_path for p in self.plugin.audio_outputs]
 
     @property
     def midi_inputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.midi_inputs]
+        return [p.graph_path for p in self.plugin.midi_inputs]
 
     @property
     def midi_outputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.midi_outputs]
+        return [p.graph_path for p in self.plugin.midi_outputs]
 
     @property
     def cv_inputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.cv_inputs]
+        return [p.graph_path for p in self.plugin.cv_inputs]
 
     @property
     def cv_outputs(self) -> list[str]:
-        return [f"{self.label}/{p.symbol}" for p in self.plugin.cv_outputs]
+        return [p.graph_path for p in self.plugin.cv_outputs]
 
     @property
     def join_outputs(self) -> bool:

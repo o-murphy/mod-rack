@@ -1,6 +1,8 @@
+from __future__ import annotations
 from enum import Enum
 from typing import Literal
-from pydantic import BaseModel, Field
+from typing_extensions import Self
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pathlib import Path
 
 __all__ = [
@@ -29,6 +31,7 @@ class PortType(str, Enum):
     MIDI = "midi"
     CV = "cv"
     CONTROL = "control"
+    UNKNOWN = "unknown"
 
 
 class PortDirection(str, Enum):
@@ -121,6 +124,8 @@ class ScalePoint(BaseModel):
 
 
 class Port(BaseModel):
+    model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
+
     valid: bool = True
     index: int
     name: str
@@ -133,6 +138,17 @@ class Port(BaseModel):
     properties: list[ControlProperty] = Field(default_factory=list)
     rangeSteps: int = 0
     scalePoints: list[ScalePoint] = Field(default_factory=list)
+
+    # Back-references populated by Effect.model_validator (excluded from serialization)
+    effect: Effect | None = Field(default=None, exclude=True)
+    port_type: PortType = Field(default=PortType.UNKNOWN, exclude=True)
+    direction: PortDirection = Field(default=PortDirection.UNKNOWN, exclude=True)
+
+    @property
+    def graph_path(self) -> str:
+        if self.effect is None:
+            return self.symbol
+        return f"{self.effect.label}/{self.symbol}"
 
 
 class PortGroup(BaseModel):
@@ -201,3 +217,23 @@ class Effect(BaseModel):
     ports: Ports = Field(default_factory=Ports)
     parameters: list[Parameter] = Field(default_factory=list)
     presets: list[Preset] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def populate_port_refs(self) -> Self:
+        """Populate back-references on all ports."""
+        port_groups = [
+            (PortType.AUDIO, self.ports.audio),
+            (PortType.CONTROL, self.ports.control),
+            (PortType.CV, self.ports.cv),
+            (PortType.MIDI, self.ports.midi),
+        ]
+        for port_type, group in port_groups:
+            for port in group.input:
+                port.effect = self
+                port.port_type = port_type
+                port.direction = PortDirection.INPUT
+            for port in group.output:
+                port.effect = self
+                port.port_type = port_type
+                port.direction = PortDirection.OUTPUT
+        return self
