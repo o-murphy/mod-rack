@@ -28,6 +28,7 @@ from mod_rack.mod_client import (
 )
 from mod_rack.plugin import Plugin
 from mod_rack.logger import logger, ColorPrint
+from mod_rack.schema.effect import Port
 
 
 _log = logger.getChild(__name__)
@@ -82,30 +83,33 @@ class PluginSlot:
     def label(self) -> str:
         """Unique slot identifier (plugin label)."""
         return self.plugin.label
-    
+
+    def _graph_path(self, port: Port | None = None) -> str:
+        return self.plugin._graph_path(port)
+
     @property
     def audio_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_inputs]
+        return [self._graph_path(p) for p in self.plugin.audio_inputs]
 
     @property
     def audio_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_outputs]
+        return [self._graph_path(p) for p in self.plugin.audio_outputs]
 
     @property
     def midi_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_inputs]
+        return [self._graph_path(p) for p in self.plugin.midi_inputs]
 
     @property
     def midi_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_outputs]
+        return [self._graph_path(p) for p in self.plugin.midi_outputs]
 
     @property
     def cv_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_inputs]
+        return [self._graph_path(p) for p in self.plugin.cv_inputs]
 
     @property
     def cv_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.cv_outputs]
+        return [self._graph_path(p) for p in self.plugin.cv_outputs]
 
     @property
     def join_outputs(self) -> bool:

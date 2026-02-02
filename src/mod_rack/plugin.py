@@ -118,6 +118,11 @@ class Plugin:
     def control_outputs(self) -> list[Port]:
         return self._filter_and_sort_ports(self._effect.ports.control.output)
 
+    def _graph_path(self, port: Port | None) -> str:
+        if port is None:
+            return self.label
+        return f"{self.label}/{port.symbol}"
+
     def _filter_and_sort_ports(self, ports: list[Port]):
         disabled = set(self._config.disable_ports)  # O(1) lookup instead of O(n)
         return sorted(
