@@ -524,7 +524,7 @@ class RoutingManager:
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
         mode: RoutingMode = RoutingMode.HARD_BYPASS,
-    ) -> set[tuple[str, str]]:
+    ) -> set[tuple[str, str]] | None:
         match mode:
             case RoutingMode.HARD_BYPASS:
                 return cls._calculate_hard_bypass_connections(slots, input_slot, output_slot)
@@ -533,7 +533,7 @@ class RoutingManager:
             case RoutingMode.LINEAR:
                 return cls._calculate_tripple_track_connections(slots, input_slot, output_slot)
             case RoutingMode.PATCHBAY:
-                return []
+                return None
             case _:
                 raise ValueError("Unsupported routing mode")
 
@@ -702,6 +702,7 @@ class Orchestrator:
         # Locks and flags
         self._lock = threading.RLock()
         self._reorder_timer: threading.Timer | None = None
+        self._reconnect_timer: threading.Timer | None = None
         self._debounce_delay: float = DEFAULT_DEBOUNCE_DELAY
         self._loading = True
         self._normalizing = False
@@ -931,7 +932,7 @@ class Orchestrator:
                     event.src_path,
                     event.dst_path,
                 )
-                self.reconnect_seamless()
+                self._schedule_reconnect()
 
     def _on_graph_disconnect(self, event: GraphDisconnectEvent):
         _cp.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
@@ -943,7 +944,7 @@ class Orchestrator:
                 event.src_path,
                 event.dst_path,
             )
-            self.reconnect_seamless()
+            self._schedule_reconnect()
 
     def _on_position_change(self, event: GraphPluginPosEvent):
         _cp.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
@@ -1009,8 +1010,19 @@ class Orchestrator:
         with self._lock:
             # check order changed
             if old_order != new_order or force_emit or (not self.slots and old_order):
-                self.reconnect_seamless()
+                self._schedule_reconnect()
                 self._order_changed_emit()
+
+    def _schedule_reconnect(self):
+        if self._reconnect_timer:
+            self._reconnect_timer.cancel()
+
+        self._reconnect_timer = threading.Timer(
+            self._debounce_delay,
+            self.reconnect_seamless,
+        )
+
+        self._reconnect_timer.start()
 
     def _schedule_reorder(self, *, force_emit: bool = False):
         if self._reorder_timer:
@@ -1060,7 +1072,7 @@ class Orchestrator:
             return
 
         with self._lock:
-            _cp.green("--- Calculating Connections ---")
+            _cp.green("\u223f Calculating connections")
 
             # 1. Get "ideal" state from manager
             desired = RoutingManager.calculate_chain_connections(
@@ -1070,6 +1082,9 @@ class Orchestrator:
                 self.config.rack.routing_mode,
             )
 
+            if not desired:
+                return
+
             # 2. Calculate difference with Orchestrator cache
             to_connect = desired - self._connections
             to_disconnect = self._connections - desired
@@ -1077,14 +1092,14 @@ class Orchestrator:
             if not to_connect and not to_disconnect:
                 return
 
-            _cp.green("--- Syncing Graph ---")
+            _cp.green("\u29c9 Syncing graph")
             for out_p, in_p in to_connect:
                 self.client.effect_connect(out_p, in_p)
 
             for out_p, in_p in to_disconnect:
                 self.client.effect_disconnect(out_p, in_p)
 
-        _cp.green("--- Reconnect Done ---")
+        _cp.green("\u223f Routing done")
 
     def _connect_pair(self, src: AnySlot, dst: AnySlot):
         """Proxy method for point connection (e.g., when removing a plugin)."""
@@ -1127,7 +1142,7 @@ class Orchestrator:
             if not self.slots:
                 return
 
-            _cp.green("--- Clearing Rack ---")
+            _cp.red("\u232B Clearing Rack")
 
             # 1. Stop order monitoring during mass removal
             # (optional, but useful to have a mass operation flag)

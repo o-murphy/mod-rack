@@ -56,15 +56,11 @@ class Plugin:
         effect_data: dict = self.client.effect_get(self.uri)
 
         self._bypassed = False
-        self._config = (
-            config if config is not None else PluginConfig(self.label, self.uri)
-        )
+        self._config = config if config is not None else PluginConfig(name=self.name, uri=self.uri)
 
         self._effect = Effect.model_validate(effect_data)
 
-        self.size: tuple[int, int] = self.client.effect_image_size(
-            self.uri, "screenshot.png"
-        )
+        self.size: tuple[int, int] = self.client.effect_image_size(self.uri, "screenshot.png")
 
         self._controls: dict[str, PortControl] = {}
         self._load_controls(filter_gui_controls)
@@ -139,9 +135,7 @@ class Plugin:
         if self.label == event.label:
             self._bypassed = event.bypassed
 
-    def _on_control_change(
-        self, event: GraphParamSetEvent | GraphOutputSetEvent
-    ) -> None:
+    def _on_control_change(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
         if self.label == event.label and event.symbol in self.controls:
             self.set_cached_value(event.symbol, event.value)
 
@@ -174,12 +168,8 @@ class Plugin:
         """
         # Parse all ports from effect data
 
-        controls = parse_control_ports(
-            self.label, self._effect, filter_gui_controls=filter_gui_controls
-        )
-        self._controls = {
-            c.symbol: c for c in sorted(controls, key=attrgetter("index"))
-        }
+        controls = parse_control_ports(self.label, self._effect, filter_gui_controls=filter_gui_controls)
+        self._controls = {c.symbol: c for c in sorted(controls, key=attrgetter("index"))}
 
     # --- Dict-like access to control values ---
 
@@ -202,9 +192,7 @@ class Plugin:
     def param_set(self, symbol: str, value: float) -> bool:
         """Set parameter via Client API."""
         if symbol not in self._controls:
-            raise KeyError(
-                f"Control '{symbol}' not found. Available: {list(self._controls.keys())}"
-            )
+            raise KeyError(f"Control '{symbol}' not found. Available: {list(self._controls.keys())}")
 
         # Sync to API via POST
         self.client.ws.effect_param_set(self.label, symbol, value)

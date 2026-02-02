@@ -388,14 +388,14 @@ class SlotWidget(QFrame):
 
     def mousePressEvent(self, event):
         # emit click and store drag start position
-        _log.debug("MOUSE_PRESS: label=%s pos=%s", self.slot_label_id, event.pos())
+        _log.debug("MOUSE_PRESS: label=%s pos=%s", self.slot_label_id, event.position())
         self.clicked.emit(self.slot_label_id)
-        self._drag_start_pos = event.pos()
+        self._drag_start_pos = event.position()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self._drag_start_pos is not None:
-            distance = (event.pos() - self._drag_start_pos).manhattanLength()
+            distance = (event.position() - self._drag_start_pos).manhattanLength()
             _log.debug("MOUSE_MOVE: label=%S distance=%s", self.slot_label_id, distance)
             if distance >= QApplication.startDragDistance():
                 from PySide6.QtGui import QDrag, QPixmap
