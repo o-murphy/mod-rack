@@ -50,7 +50,7 @@ class RackWSClient(QObject):
                 self._running = True
                 threading.Thread(target=self._listen, daemon=True).start()
                 # Request initial state
-                self.send_cmd({"cmd": "get_order"})
+                self.send_cmd({"cmd": "order"})
                 return True
         except Exception as e:
             print(f"Connection error: {e}")

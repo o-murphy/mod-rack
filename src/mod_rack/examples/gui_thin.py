@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
             cb.setChecked(slot.get("bypassed", False))
             cb.stateChanged.connect(
                 lambda state, lbl=slot["label"]: self.client.send_cmd(
-                    {"cmd": "set_bypass", "label": lbl, "bypassed": bool(state)}
+                    {"cmd": "bypass", "label": lbl, "bypassed": bool(state)}
                 )
             )
             self.layout.addWidget(cb)
@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
                         min_v=ctrl["minimum"],
                         max_v=ctrl["maximum"]: self.client.send_cmd(
                             {
-                                "cmd": "set_param",
+                                "cmd": "param",
                                 "label": lbl,
                                 "symbol": s,
                                 "value": min_v + (v / 1000) * (max_v - min_v),

@@ -176,12 +176,27 @@ class RackClient:
         """Send JSON message."""
         self._send_frame(json.dumps(msg).encode())
 
+    def get_list(self):
+        if not self._connected:
+            return []
+        
+        self._send({"cmd": "list"})
+        response = self._recv_frame()
+        response = self._recv_frame()
+
+        if response:
+            data = json.loads(response)
+            if data.get("event") == "list":
+                return data.get("effects", [])
+
+        return []
+
     def get_order(self):
         """Request current order from server. Returns list of slot dicts."""
         if not self._connected:
             return []
 
-        self._send({"cmd": "get_order"})
+        self._send({"cmd": "order"})
         response = self._recv_frame()
 
         if response:
@@ -191,20 +206,27 @@ class RackClient:
                 return self._slots
 
         return []
+    
+    def move_slot(self, from_idx, to_idx):
+        if not self._connected:
+            return
+        self._send(
+            {"cmd": "mv", "from_idx": from_idx, "to_idx": to_idx}
+        )
 
     def set_param(self, label, symbol, value):
         """Set a plugin parameter (only INPUT controls). Fire and forget."""
         if not self._connected:
             return
         self._send(
-            {"cmd": "set_param", "label": label, "symbol": symbol, "value": value}
+            {"cmd": "param", "label": label, "symbol": symbol, "value": value}
         )
 
     def set_bypass(self, label, bypassed):
         """Set plugin bypass state. Fire and forget."""
         if not self._connected:
             return
-        self._send({"cmd": "set_bypass", "label": label, "bypassed": bypassed})
+        self._send({"cmd": "bypass", "label": label, "bypassed": bypassed})
 
     @property
     def slots(self):
@@ -371,6 +393,8 @@ if __name__ == "__main__":
         # Test loop: oscillate by +-0.5
         direction = 1
         step = 0.5
+
+        # print(len(client.get_list()))
 
         while True:
             # Calculate new value

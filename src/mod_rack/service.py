@@ -13,7 +13,6 @@ import logging
 # import sys
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -24,13 +23,10 @@ from mod_rack.mod_client import (
     GraphParamSetBypassEvent,
 )
 from mod_rack.schema.config import Config
-from mod_rack.rack import Orchestrator, OrchestratorMode
+from mod_rack.rack import OrchestratorMode, PluginSlot, Rack
 from mod_rack.controls import PortControl
 from mod_rack.mod_client import DEFAULT_SERVER_URL
 from mod_rack.logger import logger
-
-if TYPE_CHECKING:
-    from mod_rack.rack import Orchestrator, PluginSlot
 
 
 __all__ = ["main", "get_argparser", "RackWSServer"]
@@ -57,7 +53,7 @@ def _serialize_control(ctrl: PortControl) -> dict:
     }
 
 
-def _serialize_slot(slot: "PluginSlot") -> dict:
+def _serialize_slot(slot: PluginSlot) -> dict:
     """Serialize a PluginSlot with its controls to dict for JSON."""
     return {
         "label": slot.label,
@@ -72,14 +68,14 @@ class RackWSServer:
 
     Protocol:
         Client -> Server:
-            {"cmd": "get_order"}
+            {"cmd": "order"}
 
         Server -> Client:
             {"event": "order", "slots": [{label, controls: [...]}]}
     """
 
-    def __init__(self, orchestrator: "Orchestrator", host: str = "0.0.0.0", port: int = 9000):
-        self.orchestrator = orchestrator
+    def __init__(self, rack: Rack, host: str = "0.0.0.0", port: int = 9000):
+        self.rack = rack
         self.host = host
         self.port = port
         self._clients: set[ServerConnection] = set()
@@ -87,16 +83,32 @@ class RackWSServer:
         self._server_task: asyncio.Task | None = None
 
         # Register for order changes
-        orchestrator.on_rack_order_changed(self._on_order_changed)
+        rack.on_rack_order_changed(self._on_order_changed)
 
         # Register for param changes
-        orchestrator.client.ws.on(GraphParamSetEvent, self._on_control_changed)
-        orchestrator.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
-        orchestrator.client.ws.on(GraphOutputSetEvent, self._on_control_changed)
+        rack.client.ws.on(GraphParamSetEvent, self._on_control_changed)
+        rack.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_changed)
+        rack.client.ws.on(GraphOutputSetEvent, self._on_control_changed)
+
+    def _get_list(self):
+        data = self.rack.installed_plugins
+        return [
+            {
+                "uri": effect.get("uri"),
+                "name": effect.get("name"),
+                "brand": effect.get("brand"),
+                "label": effect.get("label"),
+                "category": effect.get("category"),
+            }
+            for effect in data
+        ]
 
     def _get_order_data(self) -> list[dict]:
         """Get current order as list of slot data with controls."""
-        return [_serialize_slot(slot) for slot in self.orchestrator.slots]
+        return [_serialize_slot(slot) for slot in self.rack.slots]
+
+    def _move_slot(self, from_idx: int, to_idx: int):
+        return self.rack.request_move_slot(from_idx, to_idx)
 
     def _set_param(self, label: str, symbol: str, value: float) -> None:
         """Set a plugin parameter. Only works for INPUT controls."""
@@ -104,7 +116,7 @@ class RackWSServer:
 
         _log.debug("[RACK WS] _set_param: %s/%s = %s", label, symbol, value)
 
-        slot = self.orchestrator.get_slot_by_label(label)
+        slot = self.rack.get_slot_by_label(label)
         if not slot:
             _log.debug("[RACK WS] slot not found: %s", label)
             return
@@ -136,7 +148,7 @@ class RackWSServer:
 
     def _set_bypass(self, label: str, bypassed: bool) -> None:
         """Set plugin bypass state."""
-        slot = self.orchestrator.get_slot_by_label(label)
+        slot = self.rack.get_slot_by_label(label)
         if slot:
             slot.plugin.bypass(bypassed)
 
@@ -210,20 +222,31 @@ class RackWSServer:
                     msg = json.loads(raw)
                     cmd = msg.get("cmd")
 
-                    if cmd == "get_order":
+                    if cmd == "order":
                         slots_data = self._get_order_data()
                         await websocket.send(json.dumps({"event": "order", "slots": slots_data}))
 
-                    elif cmd == "set_param":
+                    elif cmd == "list":
+                        effects_list = self._get_list()
+                        await websocket.send(json.dumps({"event": "list", "effects": effects_list}))
+
+                    elif cmd == "param":
                         label = msg.get("label")
                         symbol = msg.get("symbol")
                         value = msg.get("value")
                         self._set_param(label, symbol, value)
 
-                    elif cmd == "set_bypass":
+                    elif cmd == "bypass":
                         label = msg.get("label")
                         bypassed = msg.get("bypassed", False)
                         self._set_bypass(label, bypassed)
+
+                    elif cmd == "mv":
+                        from_idx = msg.get("from_idx")
+                        to_idx = msg.get("to_idx")
+                        if from_idx is None or to_idx is None:
+                            return
+                        self._move_slot(from_idx, to_idx)
 
                     else:
                         await websocket.send(json.dumps({"error": f"unknown cmd: {cmd}"}))
@@ -294,7 +317,7 @@ def main():
     logger.info("Connecting to MOD server at %s...", ns.server)
 
     mode = OrchestratorMode.OBSERVER if ns.slave else OrchestratorMode.MANAGER
-    orchestrator = Orchestrator(ns.server, config, mode)
+    orchestrator = Rack(ns.server, config, mode)
 
     # Now the logic works exactly as you wanted:
     if ns.rack_ws_port is not None:
