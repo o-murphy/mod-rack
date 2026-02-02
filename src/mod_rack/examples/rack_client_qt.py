@@ -6,8 +6,8 @@ from PySide6.QtCore import QObject, Signal
 
 class RackWSClient(QObject):
     """
-    Легкий WebSocket клієнт для PySide6.
-    Надсилає сигнали Qt при отриманні даних від сервера.
+    Lightweight WebSocket client for PySide6.
+    Sends Qt signals when receiving data from server.
     """
 
     order_changed = Signal(list)
@@ -46,10 +46,10 @@ class RackWSClient(QObject):
             if "101" in response:
                 self._connected = True
                 self.connection_status.emit(True)
-                # Запускаємо потік читання
+                # Start reading thread
                 self._running = True
                 threading.Thread(target=self._listen, daemon=True).start()
-                # Запитуємо початковий стан
+                # Request initial state
                 self.send_cmd({"cmd": "get_order"})
                 return True
         except Exception as e:

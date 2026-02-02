@@ -119,10 +119,10 @@ class Plugin:
         return self._filter_and_sort_ports(self._effect.ports.control.output)
 
     def _filter_and_sort_ports(self, ports: list[Port]):
-        disabled = set(self._config.disable_ports)  # O(1) lookup замість O(n)
+        disabled = set(self._config.disable_ports)  # O(1) lookup instead of O(n)
         return sorted(
             (p for p in ports if p.symbol not in disabled),
-            key=attrgetter("index"),  # швидше за lambda
+            key=attrgetter("index"),  # faster than lambda
         )
 
     def _subscribe(self) -> None:
@@ -148,14 +148,14 @@ class Plugin:
         label: str,
         config: Config,
     ) -> Plugin | None:
-        # Перевіряємо whitelist
+        # Check whitelist
         plugin_config = config.get_plugin_by_uri(uri)
         if not plugin_config:
             _log.warning("[PLUGIN] Plugin not in whitelist, ignoring: %uri", uri)
             return None
 
         plugin = cls(
-            client=client,  # Буде встановлено після створення Slot
+            client=client,  # Will be set after Slot creation
             uri=uri,
             label=label,
             config=plugin_config,

@@ -1,6 +1,6 @@
 import json
 
-# Шлях до вашого файлу
+# Path to your file
 INPUT_JSON = "plugins.json"
 OUTPUT_TOML = "plugins_output.toml"
 
@@ -9,7 +9,7 @@ def generate_toml():
     with open(INPUT_JSON, "r", encoding="utf-8") as f:
         plugins_data = json.load(f)
 
-    # Використовуємо множину для унікальності за URI
+    # Use set for uniqueness by URI
     seen_uris = set()
     output = []
 
@@ -21,7 +21,7 @@ def generate_toml():
         "# =============================================================================\n"
     )
 
-    # Словник для групування по категоріях для красивого виводу
+    # Dict for grouping by categories for nice output
     categories = {}
 
     for plugin in plugins_data:
@@ -32,7 +32,7 @@ def generate_toml():
         seen_uris.add(uri)
 
         name = plugin.get("name", "Unknown")
-        # Беремо першу категорію зі списку або ставимо 'utility'
+        # Take first category from list or set 'utility'
         cat_list = plugin.get("category", [])
         category = cat_list[0].lower() if cat_list else "utility"
 
@@ -41,7 +41,7 @@ def generate_toml():
 
         categories[category].append({"name": name, "uri": uri, "category": category})
 
-    # Сортуємо категорії для порядку
+    # Sort categories for order
     sorted_cats = sorted(categories.keys())
 
     for cat in sorted_cats:
@@ -51,12 +51,12 @@ def generate_toml():
             output.append(f'name = "{p["name"]}"')
             output.append(f'uri = "{p["uri"]}"')
             output.append(f'category = "{p["category"]}"')
-            output.append("")  # порожній рядок між плагінами
+            output.append("")  # empty line between plugins
 
     with open(OUTPUT_TOML, "w", encoding="utf-8") as f:
         f.write("\n".join(output))
 
-    print(f"Готово! Згенеровано {len(seen_uris)} плагінів у файлі {OUTPUT_TOML}")
+    print(f"Done! Generated {len(seen_uris)} plugins in file {OUTPUT_TOML}")
 
 
 if __name__ == "__main__":

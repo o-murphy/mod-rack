@@ -320,7 +320,7 @@ def main():
     mode = OrchestratorMode.OBSERVER if ns.slave else OrchestratorMode.MANAGER
     orchestrator = Orchestrator(ns.server, config, mode)
 
-    # Тепер логіка працює саме так, як ви хотіли:
+    # Now the logic works exactly as you wanted:
     if ns.rack_ws_port is not None:
         logger.info("Starting Rack WebSocket server on port %s...", ns.rack_ws_port)
         ws_server = RackWSServer(orchestrator, port=ns.rack_ws_port)

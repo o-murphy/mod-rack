@@ -24,14 +24,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
-        # Підключення сигналів клієнта до GUI
+        # Connect client signals to GUI
         self.client.order_changed.connect(self.rebuild_ui)
         self.client.param_changed.connect(self.on_remote_param_change)
         self.client.bypass_changed.connect(self.on_remote_bypass_change)
 
     def rebuild_ui(self, slots):
         self.slots = slots
-        # Очистка лейауту
+        # Clear layout
         for i in reversed(range(self.layout.count())):
             self.layout.itemAt(i).widget().setParent(None)
 
@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
             label = QLabel(f"<b>{slot['label']}</b>")
             self.layout.addWidget(label)
 
-            # Кнопка Bypass
+            # Bypass button
             cb = QCheckBox("Bypass")
             cb.setChecked(slot.get("bypassed", False))
             cb.stateChanged.connect(
@@ -49,13 +49,13 @@ class MainWindow(QMainWindow):
             )
             self.layout.addWidget(cb)
 
-            # Слайдери для параметрів
+            # Sliders for parameters
             for ctrl in slot.get("controls", []):
                 if ctrl["direction"] == "INPUT":
                     self.layout.addWidget(QLabel(f"{ctrl['name']}:"))
                     slider = QSlider(Qt.Horizontal)
                     slider.setRange(0, 1000)
-                    # Конвертація значення в позицію слайдера
+                    # Convert value to slider position
                     val = int(
                         (ctrl["value"] - ctrl["minimum"])
                         / (ctrl["maximum"] - ctrl["minimum"])
@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
                     )
                     slider.setValue(val)
 
-                    # При зміні - надсилаємо команду на сервер
+                    # On change - send command to server
                     slider.valueChanged.connect(
                         lambda v,
                         lbl=slot["label"],
@@ -81,8 +81,8 @@ class MainWindow(QMainWindow):
                     self.layout.addWidget(slider)
 
     def on_remote_param_change(self, label, symbol, value):
-        # Тут можна знайти потрібний слайдер і оновити його,
-        # щоб GUI відображав зміни від MicroPython або іншого GUI
+        # Here you can find needed slider and update it,
+        # so GUI reflects changes from MicroPython or another GUI
         print(f"Remote change: {label} {symbol} = {value}")
 
     def on_remote_bypass_change(self, label, bypassed):
@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
 
-    # Створюємо і запускаємо клієнт
+    # Create and start client
     client = RackWSClient("localhost", 9000)
     if not client.connect_server():
         print("Could not connect to service.py! Make sure it is running.")

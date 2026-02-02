@@ -560,7 +560,7 @@ class ControlsPanel(QScrollArea):
                     in_col = 0
                     in_row += 1
 
-        # Додаємо фрейми у правильному порядку
+        # Add frames in correct order
         if out_row or out_col:
             self._layout.addWidget(outputs_group)
 
@@ -675,8 +675,8 @@ class MainWindow(QMainWindow):
         self.rack.client.ws.connect()
 
     def _handle_rack_cb(self, slots: list):
-        """Цей метод виконується у фоновому потоці Orchestrator."""
-        # Просто перекидаємо дані в головний потік через сигнал
+        """This method executes in background Orchestrator thread."""
+        # Just pass data to main thread via signal
         self.order_changed_signal.emit(slots)
 
     def _rebuild_slot_widgets(self):
@@ -838,22 +838,22 @@ def main():
 
     config = Config.load(ns.config)
 
-    # ВАЖЛИВО: Переконайтеся, що RackWSServer імпортований
-    # з вашого файлу ws_server.py
+    # IMPORTANT: Make sure RackWSServer is imported
+    # from your ws_server.py file
     # from mod_rack.ws_server import RackWSServer
 
     logger.info(f"Connecting to MOD server at {ns.server}...")
 
-    # Ви використовували назву Orchestrator у попередніх файлах
-    # Якщо у вас клас називається Rack, логіка залишається такою ж
+    # You used the name Orchestrator in previous files
+    # If your class is named Rack, the logic remains the same
     mode = OrchestratorMode.OBSERVER if ns.slave else OrchestratorMode.MANAGER
     rack = Rack(ns.server, config, mode)
 
-    # Запуск WebSocket сервера, якщо вказано прапорець
+    # Start WebSocket server if flag is set
     if ns.rack_ws_port is not None:
         logger.info("Starting Rack WebSocket server on port %s...", ns.rack_ws_port)
         ws_server = RackWSServer(rack, port=ns.rack_ws_port)
-        ws_server.start()  # Запускається у фоновому потоці
+        ws_server.start()  # Starts in background thread
 
     # Create and run app
     app = QApplication(sys.argv)
@@ -867,12 +867,12 @@ def main():
 
     window.show()
 
-    # Timer для обробки сигналів (Ctrl+C)
+    # Timer for signal handling (Ctrl+C)
     timer = QTimer()
     timer.start(500)
     timer.timeout.connect(lambda: None)
 
-    # Запуск циклу подій GUI
+    # Start GUI event loop
     sys.exit(app.exec())
 
 

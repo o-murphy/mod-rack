@@ -144,7 +144,7 @@ class _BaseHwPortEvent:
     symbol: str
 
     def __eq__(self, other):
-        # Порівнюємо тільки за іменем порту
+        # Compare only by port name
         if isinstance(other, _BaseHwPortEvent):
             return self.symbol == other.symbol
         return False
@@ -177,7 +177,7 @@ class _BaseGraphConnectionEvent:
         return False
 
     def __hash__(self):
-        # Хешуємо кортеж із полів, щоб однакові дані давали однаковий хеш
+        # Hash tuple of fields so identical data gives same hash
         return hash((self.src_path, self.dst_path))
 
 
@@ -441,7 +441,7 @@ class WsProtocol:
 
 
 class WsConnection:
-    # Помилки після яких реконнект не має сенсу
+    # Errors after which reconnect doesn't make sense
     NON_RECOVERABLE_ERRORS = (
         OSError,  # Includes socket.gaierror (DNS), SSL errors
     )
@@ -540,7 +540,7 @@ class WsConnection:
             if not self._should_run or not self._auto_reconnect:
                 break
 
-            # Не реконнектимось якщо помилка non-recoverable
+            # Don't reconnect if error is non-recoverable
             if not self._should_reconnect:
                 _log.error(
                     "[MOD WS] Non-recoverable error, stopping reconnect attempts"
@@ -581,10 +581,10 @@ class WsConnection:
             self._on_close()
 
     def _is_recoverable(self, error: Exception) -> bool:
-        """Визначає чи варто реконнектитись після цієї помилки."""
-        # DNS помилки, SSL помилки - не варто
+        """Determine whether to reconnect after this error."""
+        # DNS errors, SSL errors - not worth it
         if isinstance(error, self.NON_RECOVERABLE_ERRORS):
-            # Але ConnectionRefusedError (підклас OSError) - recoverable
+            # But ConnectionRefusedError (subclass of OSError) - recoverable
             if isinstance(error, ConnectionRefusedError):
                 return True
             # gaierror (DNS) - non-recoverable
@@ -593,7 +593,7 @@ class WsConnection:
             # SSL errors - non-recoverable
             if isinstance(error, ssl.SSLError):
                 return False
-            # Інші OSError (network unreachable, etc) - recoverable
+            # Other OSError (network unreachable, etc) - recoverable
             return True
 
         # WebSocket specific errors
@@ -607,32 +607,32 @@ class WsConnection:
                 ):
                     return False
 
-        # За замовчуванням - recoverable
+        # By default - recoverable
         return True
 
 
 class StateSnapshot:
     def __init__(self):
-        # Використовуємо dict для O(1) пошуку еквівалентних подій
+        # Use dict for O(1) lookup of equivalent events
         self._events: defaultdict[type, dict] = defaultdict(dict)
         self._lock = threading.RLock()
 
     def add(self, event):
         """
-        Додає подію. Якщо еквівалентна подія (за правилами dataclass)
-        вже існує — вона буде оновлена новим значенням.
+        Add event. If equivalent event (by dataclass rules)
+        already exists - it will be updated with new value.
         """
         with self._lock:
             event_type = type(event)
-            # 1. Якщо подія вже є (наприклад, той самий параметр іншого значення),
-            # pop видалить стару версію, щоб нова стала в кінець черги.
+            # 1. If event already exists (e.g., same parameter with different value),
+            # pop will remove old version so new one goes to end of queue.
             self._events[event_type].pop(event, None)
 
-            # 2. Додаємо нову версію події
+            # 2. Add new version of event
             self._events[event_type][event] = None
 
     def remove(self, event):
-        """Видалити конкретну подію"""
+        """Remove specific event"""
         with self._lock:
             events_dict = self._events.get(type(event))
             if events_dict:
@@ -641,14 +641,14 @@ class StateSnapshot:
                     del self._events[type(event)]
 
     def clear(self):
-        """Очистити всі події"""
+        """Clear all events"""
         with self._lock:
             self._events.clear()
 
     def __getitem__(self, event_type: Type):
-        """Отримати список подій певного типу"""
+        """Get list of events of specific type"""
         with self._lock:
-            # Повертає впорядкований список унікальних за структурою подій
+            # Return ordered list of structurally unique events
             return list(self._events.get(event_type, {}).keys())
 
 
@@ -833,12 +833,12 @@ class Client:
 
         content_type = resp.headers.get("Content-Type", "")
 
-        # 1. Обробка зображень (PNG, JPEG тощо)
+        # 1. Process images (PNG, JPEG, etc.)
         if "image/" in content_type:
             data = resp.content
             return data
 
-        # 2. Обробка тексту та JSON
+        # 2. Process text and JSON
         text = resp.text.strip()
 
         if text.lower() == "true":
@@ -861,16 +861,16 @@ class Client:
     # =========================================================================
 
     def effect_list(self) -> list[dict]:
-        """Отримати список всіх доступних ефектів"""
+        """Get list of all available effects"""
         data = self._get("/effect/list")
         return data if isinstance(data, list) else []
 
     def effect_get(self, uri: str):
-        """Отримати детальну інформацію про ефект"""
+        """Get detailed effect information"""
         return self._get("/effect/get", uri=uri, version=self.version)
 
     def effect_image(self, uri: str, filename: str = "screenshot.png"):
-        """Отримати скріншот ефекту"""
+        """Get effect screenshot"""
         return self._get(f"/effect/image/{filename}", uri=uri)
 
     def effect_image_size(
@@ -886,13 +886,13 @@ class Client:
 
             content_type = resp.headers.get("Content-Type", "")
 
-            # 1. Обробка зображень (PNG, JPEG тощо)
+            # 1. Process images (PNG, JPEG, etc.)
             if "image/" in content_type:
                 data = resp.content
 
                 # info = f"image ({len(data)} bytes)"
 
-                # Спроба отримати розміри PNG без Pillow
+                # Try to get PNG dimensions without Pillow
                 if "image/png" in content_type and len(data) >= 24:
                     try:
                         w, h = struct.unpack(">II", data[16:24])
@@ -906,21 +906,21 @@ class Client:
     def effect_add(
         self, label: str, uri: str, x: int = 200, y: int = 400
     ) -> dict | None:
-        """Додати ефект на граф"""
+        """Add effect to graph"""
         return self._get(f"/effect/add//graph/{label}", uri=uri, x=x, y=y)
 
     def effect_remove(self, label: str) -> bool:
-        """Видалити ефект з графа"""
+        """Remove effect from graph"""
         result = self._get(f"/effect/remove//graph/{label}")
         return result is True
 
     def effect_connect(self, output: str, input: str) -> bool:
-        """З'єднати два порти"""
+        """Connect two ports"""
         result = self._get(f"/effect/connect//graph/{output},/graph/{input}")
         return result is True
 
     def effect_disconnect(self, output: str, input: str) -> bool:
-        """Роз'єднати два порти"""
+        """Disconnect two ports"""
         result = self._get(f"/effect/disconnect//graph/{output},/graph/{input}")
         return result is True
 
@@ -931,11 +931,11 @@ class Client:
         return self._post("/effect/parameter/set/", f"/graph/{label}/{symbol}/{value}")
 
     def effect_preset_load(self, label: str, preset_uri: str):
-        """Завантажити пресет для ефекту"""
+        """Load preset for effect"""
         return self._get(f"/effect/preset/load//graph/{label}", uri=preset_uri)
 
     def effect_position(self, label: str, x: float, y: float):
-        """Змінити позицію ефекту на UI"""
+        """Change effect position on UI"""
         # Prefer WebSocket plugin_pos command when available (real-time UI placement)
         try:
             if self.ws and self.ws.plugin_pos(label, x, y):
@@ -951,36 +951,36 @@ class Client:
     # =========================================================================
 
     def pedalboard_list(self):
-        """Отримати список всіх педалбордів"""
+        """Get list of all pedalboards"""
         return self._get("/pedalboard/list")
 
     def pedalboard_current(self):
-        """Отримати поточний стан педалборда"""
+        """Get current pedalboard state"""
         return self._get("/pedalboard/current")
 
     def pedalboard_load_bundle(self, pedalboard: str, is_default: int = 0):
-        """Завантажити педалборд з бандла"""
+        """Load pedalboard from bundle"""
         return self._get(
             "/pedalboard/load_bundle", bundlepath=pedalboard, isDefault=is_default
         )
 
     def pedalboard_save(self, title: str | None = None):
-        """Зберегти поточний педалборд"""
+        """Save current pedalboard"""
         params = {}
         if title:
             params["title"] = title
         return self._get("/pedalboard/save", **params)
 
     def pedalboard_save_as(self, title: str):
-        """Зберегти педалборд під новим ім'ям"""
+        """Save pedalboard with new name"""
         return self._get("/pedalboard/save_as", title=title)
 
     def pedalboard_remove(self, bundlepath: str):
-        """Видалити педалборд"""
+        """Delete pedalboard"""
         return self._get("/pedalboard/remove", bundlepath=bundlepath)
 
     def pedalboard_info(self, bundlepath: str):
-        """Отримати інформацію про педалборд"""
+        """Get pedalboard info"""
         return self._get("/pedalboard/info", bundlepath=bundlepath)
 
     # =========================================================================
@@ -988,23 +988,23 @@ class Client:
     # =========================================================================
 
     def snapshot_list(self):
-        """Отримати список снепшотів"""
+        """Get list of snapshots"""
         return self._get("/snapshot/list")
 
     def snapshot_load(self, snapshot_id: int):
-        """Завантажити снепшот"""
+        """Load snapshot"""
         return self._get(f"/snapshot/load/{snapshot_id}")
 
     def snapshot_save(self):
-        """Зберегти поточний снепшот"""
+        """Save current snapshot"""
         return self._get("/snapshot/save")
 
     def snapshot_save_as(self, name: str):
-        """Зберегти снепшот під новим ім'ям"""
+        """Save snapshot with new name"""
         return self._get("/snapshot/save_as", name=name)
 
     def snapshot_remove(self, snapshot_id: int):
-        """Видалити снепшот"""
+        """Delete snapshot"""
         return self._get(f"/snapshot/remove/{snapshot_id}")
 
     # =========================================================================
@@ -1012,11 +1012,11 @@ class Client:
     # =========================================================================
 
     def banks_list(self):
-        """Отримати список банків"""
+        """Get list of banks"""
         return self._get("/banks/list")
 
     def banks_save(self):
-        """Зберегти банки"""
+        """Save banks"""
         return self._get("/banks/save")
 
     # =========================================================================
@@ -1024,7 +1024,7 @@ class Client:
     # =========================================================================
 
     def midi_learn(self, label: str, symbol: str):
-        """Почати MIDI learn для параметра"""
+        """Start MIDI learn for parameter"""
         return self._get(f"/effect/midi/learn//graph/{label}/{symbol}")
 
     def midi_map(
@@ -1036,13 +1036,13 @@ class Client:
         minimum: float = 0.0,
         maximum: float = 1.0,
     ):
-        """Призначити MIDI CC на параметр"""
+        """Assign MIDI CC to parameter"""
         return self._get(
             f"/effect/midi/map//graph/{label}/{symbol}/{channel}/{cc}/{minimum}/{maximum}"
         )
 
     def midi_unmap(self, label: str, symbol: str):
-        """Видалити MIDI mapping з параметра"""
+        """Remove MIDI mapping from parameter"""
         return self._get(f"/effect/midi/unmap//graph/{label}/{symbol}")
 
     # =========================================================================
@@ -1054,15 +1054,15 @@ class Client:
         return self._get("/ping")
 
     def reset(self):
-        """Скинути стан (видалити всі ефекти)"""
+        """Reset state (remove all effects)"""
         return self._get("/reset")
 
     def system_info(self):
-        """Отримати інформацію про систему"""
+        """Get system info"""
         return self._get("/system/info")
 
     def system_prefs(self):
-        """Отримати системні налаштування"""
+        """Get system preferences"""
         return self._get("/system/prefs")
 
     # =========================================================================

@@ -26,9 +26,9 @@ class PluginConfig:
     name: str
     uri: str
     category: list[str] = field(default_factory=list)
-    # Опціональні override для портів (для моно/стерео конверсії)
+    # Optional override for ports (for mono/stereo conversion)
     disable_ports: list[str] = field(default_factory=list)
-    # All-to-all routing: з'єднати всі входи/виходи між собою
+    # All-to-all routing: connect all inputs/outputs to each other
     join_inputs: bool = False
     join_outputs: bool = False
 
@@ -43,11 +43,11 @@ class HardwareConfig:
 
 
 class RoutingMode(Enum):
-    LINEAR = "linear"  # Суворий 1->2->3 (з ризиком розривів)
-    # Кожен вихід шукає найближчий наступний вхід (паралелізм)
+    LINEAR = "linear"  # Strict 1->2->3 (with risk of breaks)
+    # Each output looks for nearest next input (parallelism)
     HARD_BYPASS = "hard_bypass"
-    TRIPPLE_TRACK = "tripple_track"  # Незалежні аудіо та міді ланцюги
-    PATCHBAY = "patchbay"  # Вимкнути авто-роутинг повністю
+    TRIPPLE_TRACK = "tripple_track"  # Independent audio and MIDI chains
+    PATCHBAY = "patchbay"  # Disable auto-routing completely
 
 
 @dataclass
@@ -65,7 +65,7 @@ class Config:
 
     @classmethod
     def load(cls, path: str | Path = "config.toml") -> "Config":
-        """Завантажує конфігурацію з TOML файлу"""
+        """Load configuration from TOML file"""
         path = Path(path)
 
         if not path.exists():
@@ -120,7 +120,7 @@ class Config:
         )
 
     def get_plugin_by_name(self, name: str) -> PluginConfig | None:
-        """Знайти плагін за ім'ям (case-insensitive)"""
+        """Find plugin by name (case-insensitive)"""
         name_lower = name.lower()
         for plugin in self.plugins:
             if plugin.name.lower() == name_lower:
@@ -128,22 +128,22 @@ class Config:
         return None
 
     def get_plugin_by_uri(self, uri: str) -> PluginConfig | None:
-        """Знайти плагін за URI"""
+        """Find plugin by URI"""
         for plugin in self.plugins:
             if plugin.uri == uri:
                 return plugin
         return None
 
     def is_supported(self, uri: str) -> bool:
-        """Перевірити чи плагін підтримується (є в конфігу)"""
+        """Check if plugin is supported (exists in config)"""
         return self.get_plugin_by_uri(uri) is not None
 
     def get_plugins_by_category(self, category: str) -> list[PluginConfig]:
-        """Отримати всі плагіни певної категорії"""
+        """Get all plugins of specific category"""
         return [p for p in self.plugins if category in p.category]
 
     def list_categories(self) -> list[str]:
-        """Отримати список всіх категорій"""
+        """Get list of all categories"""
         categories = set()
         for p in self.plugins:
             for category in p.category:
