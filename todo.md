@@ -9,12 +9,12 @@
 ## Done
 
 - [x] **Reactive Architecture (Server-as-Source-of-Truth)**
-  - Slot завжди містить плагін (немає пустих слотів)
-  - Slot ідентифікується по label
+  - Slot always contains a plugin (no empty slots)
+  - Slot is identified by label
   - WS feedback = source of truth
-  - Клієнт контролює порядок і routing
-  - `request_add_plugin()` / `request_remove_plugin()` - тільки REST запит
-  - `_on_plugin_added()` / `_on_plugin_removed()` - реакція на WS
+  - Client controls order and routing
+  - `request_add_plugin()` / `request_remove_plugin()` - REST request only
+  - `_on_plugin_added()` / `_on_plugin_removed()` - reaction to WS
   - UI callbacks: `on_slot_added`, `on_slot_removed`
 - [x] Make-before-break plugin switching
 - [x] Bypass feedback in UI
@@ -23,4 +23,4 @@
 - [x] WebSocket callbacks for params/bypass
 - [x] Smart channel routing (mono/stereo conversion)
 - [x] Plugin whitelist with port override
-- [x] MIDI routing (ports, routing modes: linear, hard_bypass, dual_track)
+- [x] MIDI routing (ports, routing modes: linear, hard_bypass, tripple_track)

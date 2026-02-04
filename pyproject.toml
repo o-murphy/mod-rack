@@ -1,18 +1,23 @@
+# Copyright 2025 Dmytro Yaroshenko (https://github.com/o-murphy)
+
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "mod-rack"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Add your description here"
+license = "LGPL-3.0-or-later"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "pydantic>=2.12.5",
     "pyside6>=6.10.1",
     "requests>=2.32.5",
     "tomli>=2.4.0",
     "websocket-client>=1.9.0",
+    "websockets>=16.0",
 ]
 
 [project.scripts]
@@ -21,7 +26,31 @@ mod-rack = "mod_rack.__main__:main"
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
+    "toml>=0.10.2",
     "types-requests>=2.32.4.20260107",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/mod_rack/_version.py"
+
+[tool.ruff]
+include = [
+    "pyproject.toml",
+    "py_ballisticcalc/**/*.py",
+    "py_ballisticcalc/**/*.pyi",
+    "py_ballisticcalc.exts/**/*.py",
+    "py_ballisticcalc.exts/**/*.pyi",
+]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = ["F403", "F405"]
+
+[tool.mypy]
+packages = ["mod_rack"]

@@ -1,5 +1,5 @@
 from enum import Enum, auto
-import io
+import logging
 import threading
 import time
 from typing import Any, Callable, SupportsIndex, TypeAlias
@@ -8,8 +8,9 @@ import secrets
 import string
 import weakref
 
-from mod_rack.config import Config, HardwareConfig, PluginConfig, RoutingMode
-from mod_rack.client import (
+from mod_rack.schema.config import Config, HardwareConfig, PluginConfig, RoutingMode
+from mod_rack.mod_client import (
+    DEFAULT_DEBOUNCE_DELAY,
     GraphAddHwPortEvent,
     Client,
     GraphConnectEvent,
@@ -26,15 +27,17 @@ from mod_rack.client import (
     ResetConnectionsEvent,
 )
 from mod_rack.plugin import Plugin
+from mod_rack.logger import logger, ColorPrint
+from mod_rack.schema.effect import Port
 
+
+_log = logger.getChild(__name__)
+_cp = ColorPrint(_log)
 
 # Type aliases for callbacks
-OnRackOrderChangeCallback = Callable[
-    [list["PluginSlot"]], None
-]  # order (list of labels)
+OnRackOrderChangeCallback = Callable[[list["PluginSlot"]], None]  # order (list of labels)
 OnRackOrderChangeCallbackRef: TypeAlias = (
-    weakref.ReferenceType[OnRackOrderChangeCallback]
-    | weakref.WeakMethod[OnRackOrderChangeCallback]
+    weakref.ReferenceType[OnRackOrderChangeCallback] | weakref.WeakMethod[OnRackOrderChangeCallback]
 )
 
 __all__ = [
@@ -55,19 +58,19 @@ __all__ = [
 
 class PluginSlot:
     """
-    Слот для плагіна в ланцюгу ефектів.
+    Slot for a plugin in the effects chain.
 
-    Slot завжди містить плагін (немає пустих слотів).
-    Slot ідентифікується по label плагіна.
+    Slot always contains a plugin (no empty slots).
+    Slot is identified by the plugin label.
     """
 
     def __init__(self, plugin: Plugin, pos_x: float = 0, pos_y: float = 0):
         """
-        Створює слот з плагіном.
+        Create a slot with a plugin.
 
         Args:
-            rig: Батьківський Rig
-            plugin: Плагін (обов'язковий)
+            rig: Parent Rig
+            plugin: Plugin (required)
         """
         self.plugin = plugin
         self.pos_x: float = pos_x
@@ -75,32 +78,43 @@ class PluginSlot:
 
     @property
     def label(self) -> str:
-        """Унікальний ідентифікатор слота (label плагіна)."""
+        """Unique slot identifier (plugin label)."""
         return self.plugin.label
+
+    def _graph_path(self, port: Port | None = None) -> str:
+        return self.plugin._graph_path(port)
 
     @property
     def audio_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_inputs]
+        return [self._graph_path(p) for p in self.plugin.audio_inputs]
 
     @property
     def audio_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.audio_outputs]
+        return [self._graph_path(p) for p in self.plugin.audio_outputs]
 
     @property
     def midi_inputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_inputs]
+        return [self._graph_path(p) for p in self.plugin.midi_inputs]
 
     @property
     def midi_outputs(self) -> list[str]:
-        return [p.graph_path for p in self.plugin.midi_outputs]
+        return [self._graph_path(p) for p in self.plugin.midi_outputs]
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.plugin.join_audio_outputs
+    def cv_inputs(self) -> list[str]:
+        return [self._graph_path(p) for p in self.plugin.cv_inputs]
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return self.plugin.join_audio_inputs
+    def cv_outputs(self) -> list[str]:
+        return [self._graph_path(p) for p in self.plugin.cv_outputs]
+
+    @property
+    def join_outputs(self) -> bool:
+        return self.plugin.join_outputs
+
+    @property
+    def join_inputs(self) -> bool:
+        return self.plugin.join_inputs
 
     @property
     def size(self) -> tuple[int, int]:
@@ -108,7 +122,7 @@ class PluginSlot:
 
     @staticmethod
     def _label_from_uri(uri: str) -> str:
-        """Генерує базовий label з URI плагіна."""
+        """Generate base label from plugin URI."""
         path = uri.split("#")[0].rstrip("/")
         label = path.split("/")[-1]
         return label.replace("#", "_").replace(" ", "_")
@@ -132,42 +146,42 @@ class PluginSlot:
 
 
 class HardwareSlot:
-    """Hardware I/O слот (capture/playback)."""
+    """Hardware I/O slot (capture/playback)."""
 
     def __init__(
         self,
         direction: PortDirection,
         config: HardwareConfig,
-        audio_ports: list[str] | None = None,
-        midi_ports: list[str] | None = None,
     ):
-        # Використовуємо звичайні атрибути, щоб вони були доступні відразу
-        self.audio_ports = audio_ports if audio_ports is not None else []
-        self.midi_ports = midi_ports if midi_ports is not None else []
+        # Use regular attributes so they are available immediately
+        self.audio_ports: list[str] = []
+        self.midi_ports: list[str] = []
+        self.cv_ports: list[str] = []
+
         self.direction = direction
 
-        # Налаштування з конфігу
+        # Settings from config
         if direction == PortDirection.INPUT:
-            self.join_audio_ports = config.join_audio_inputs
+            self.join_ports = config.join_inputs
             self.label = "hw_in"
-        else:
-            self.join_audio_ports = config.join_audio_outputs
+        elif direction == PortDirection.OUTPUT:
+            self.join_ports = config.join_outputs
             self.label = "hw_out"
 
     @property
     def audio_inputs(self) -> list[str]:
         """
-        Для Hardware INPUT (capture) - це джерело сигналу.
-        Але в термінах графа MOD вони поводяться як ВИХОДИ (outputs).
-        Тому для сумісності з RoutingManager:
+        For Hardware INPUT (capture) - this is the signal source.
+        But in MOD graph terms they behave as OUTPUTS.
+        So for compatibility with RoutingManager:
         """
-        # Якщо це вхідний залізячний слот, він НЕ МАЄ входів у графі (він - початок)
+        # If this is an input hardware slot, it has NO inputs in the graph (it's the start)
         return [] if self.direction == PortDirection.INPUT else self.audio_ports
 
     @property
     def audio_outputs(self) -> list[str]:
-        """Це те, що йде В ГРАФ."""
-        # Якщо це вхідний залізячний слот, його порти є ВИХОДАМИ для графа
+        """This is what goes INTO the graph."""
+        # If this is an input hardware slot, its ports are OUTPUTS for the graph
         return self.audio_ports if self.direction == PortDirection.INPUT else []
 
     @property
@@ -179,40 +193,31 @@ class HardwareSlot:
         return self.midi_ports if self.direction == PortDirection.INPUT else []
 
     @property
-    def join_audio_inputs(self) -> bool:
-        return False if self.direction == PortDirection.INPUT else self.join_audio_ports
+    def cv_inputs(self) -> list[str]:
+        return [] if self.direction == PortDirection.INPUT else self.cv_ports
 
     @property
-    def join_audio_outputs(self) -> bool:
-        return self.join_audio_ports if self.direction == PortDirection.INPUT else False
+    def cv_outputs(self) -> list[str]:
+        return self.cv_ports if self.direction == PortDirection.INPUT else []
+
+    @property
+    def join_inputs(self) -> bool:
+        return False if self.direction == PortDirection.INPUT else self.join_ports
+
+    @property
+    def join_outputs(self) -> bool:
+        return self.join_ports if self.direction == PortDirection.INPUT else False
 
     def __repr__(self):
-        return f"HardwareSlot({self.direction.name}, ports={self.audio_ports})"
+        return (
+            f"HardwareSlot({self.direction.name}, "
+            f"audio_ports={self.audio_ports}, "
+            f"midi_ports={self.midi_ports}, "
+            f"cv_ports={self.cv_ports})"
+        )
 
 
 AnySlot = HardwareSlot | PluginSlot
-
-
-class _Color:
-    @staticmethod
-    def info(msg):
-        print(f"\033[32m{msg}\033[0m")
-
-    @staticmethod
-    def blue(msg):
-        print(f"\033[34m{msg}\033[0m")
-
-    @staticmethod
-    def red(msg):
-        print(f"\033[31m{msg}\033[0m")
-
-    @staticmethod
-    def yellow(msg):
-        print(f"\033[33m{msg}\033[0m")
-
-    @staticmethod
-    def debug(msg):
-        print(f"\033[90m{msg}\033[0m")
 
 
 # =============================================================================
@@ -242,80 +247,76 @@ class GridLayoutManager:
 
     @classmethod
     def sort_slots(cls, slots: list[PluginSlot]) -> list[PluginSlot]:
-        """Реюзимо кластеризацію для отримання плаского відсортованого списку."""
+        """Reuse clustering to get a flat sorted list."""
         rows = cls.get_clustered_rows(slots)
-        # Просто "сплющуємо" список списків у один список
+        # Just flatten the list of lists into a single list
         return [slot for row in rows for slot in row]
 
     @classmethod
-    def normalize(
-        cls, slots: list[PluginSlot]
-    ) -> dict[PluginSlot, tuple[float, float]]:
+    def normalize(cls, slots: list[PluginSlot]) -> dict[PluginSlot, tuple[float, float]]:
         if not slots:
             return {}
 
         result = {}
-        # 1. Отримуємо не просто список, а список кластерів (рядів)
-        # Для цього нам треба трохи змінити або використати внутрішню логіку sort_slots
+        # 1. Get not just a list, but a list of clusters (rows)
+        # For this we need to slightly modify or use internal logic of sort_slots
         rows = cls.get_clustered_rows(slots)
 
-        # Починаємо з 0
+        # Start from 0
         prev_y: float = 0.0
         prev_h: float = 0.0
 
         for row_idx, row_slots in enumerate(rows):
-            # Кожен кластер отримує свій фіксований Y
+            # Each cluster gets its fixed Y
             y_offset = prev_y + prev_h
             y = cls.BASE_Y + max(row_idx * cls.Y_STEP, y_offset) + cls.Y_MIN_SPACING
 
-            # Сортуємо плагіни всередині ряду зліва направо
+            # Sort plugins within row left to right
             row_slots.sort(key=lambda s: s.pos_x or 0)
 
             prev_w: float = 0.0
             prev_x: float = 0.0
             for col_idx, slot in enumerate(row_slots):
-                # Кожен плагін у ряду отримує свій X
+                # Each plugin in row gets its X
                 x_offset = prev_x + prev_w
                 x = cls.BASE_X + max(col_idx * cls.X_STEP, x_offset) + cls.X_MIN_SPACING
                 result[slot] = (x, y)
                 prev_x = x
                 prev_w, _ = slot.size
 
-            # Знаходимо найвищий плагін у поточному ряду
-            # s.size[1] — це висота (height)
+            # Find tallest plugin in current row
+            # s.size[1] is height
             prev_y = y
             prev_h = max(s.size[1] for s in row_slots) if row_slots else 0
 
         return result
 
     @classmethod
-    def move_slot(
-        cls, slots: list[PluginSlot], from_idx: int, to_idx: int
-    ) -> dict[PluginSlot, tuple[float, float]]:
+    def move_slot(cls, slots: list[PluginSlot], from_idx: int, to_idx: int) -> dict[PluginSlot, tuple[float, float]]:
         """
-        Переміщує слот у списку та перепризначає існуючі координати слотам
-        відповідно до їхнього нового порядку.
+        Move slot in the list and reassign existing coordinates to slots
+        according to their new order.
         """
         if not slots:
             return {}
 
-        # 1. Отримуємо стабільно відсортований поточний список
+        # 1. Get stably sorted current list
         ordered_slots = cls.sort_slots(list(slots))
 
-        # 2. Зберігаємо всі поточні координати у тому порядку, в якому вони є зараз
-        # Це наш "шаблон" позицій на екрані
+        # 2. Save all current coordinates in the order they are now
+        # This is our "template" of positions on screen
         coords_template = [(s.pos_x, s.pos_y) for s in ordered_slots]
 
         if from_idx < 0 or from_idx >= len(ordered_slots):
             return {s: (s.pos_x, s.pos_y) for s in slots}
 
-        # 3. Виконуємо перестановку об'єктів у списку
+        # 3. Perform the reordering of objects in the list
         to_idx = max(0, min(to_idx, len(ordered_slots) - 1))
         slot_to_move = ordered_slots.pop(from_idx)
         ordered_slots.insert(to_idx, slot_to_move)
 
-        # 4. Створюємо ret_val: беремо переставлені слоти
-        # і даємо їм координати з шаблону по порядку
+        # 4. Create result: take reordered slots
+        # and give them coordinates from template in order
         result = {}
         for idx, slot in enumerate(ordered_slots):
             new_x, new_y = coords_template[idx]
@@ -328,8 +329,8 @@ class GridLayoutManager:
         if not slots:
             return []
 
-        # 1. Сортуємо ВСІ слоти спочатку по Y, потім по X, потім по label.
-        # Це гарантує детермінованість: при однакових координатах порядок не зміниться.
+        # 1. Sort ALL slots first by Y, then by X, then by label.
+        # This guarantees determinism: with same coordinates order won't change.
         active = sorted(
             slots,
             key=lambda s: (
@@ -346,44 +347,42 @@ class GridLayoutManager:
         current_row = [active[0]]
         rows.append(current_row)
 
-        # Використовуємо Y першого елемента в ряду як "якір"
+        # Use Y of first element in row as "anchor"
         row_anchor_y = active[0].pos_y
 
         for i in range(1, len(active)):
             slot = active[i]
 
-            # Порівнюємо не з середнім, а з якорем ряду.
-            # Додаємо невеликий запас (epsilon), щоб уникнути проблем з float
+            # Compare not with average, but with row anchor.
+            # Add small margin (epsilon) to avoid float issues
             if abs(slot.pos_y - row_anchor_y) <= cls.Y_THRESHOLD:
                 current_row.append(slot)
             else:
-                # Початок нового ряду
+                # Start of new row
                 current_row = [slot]
                 rows.append(current_row)
                 row_anchor_y = slot.pos_y
 
-        # 2. Додатково сортуємо кожен ряд по X, щоб нормалізація не "перемішувала" колонки
+        # 2. Additionally sort each row by X, so normalization doesn't "shuffle" columns
         for row in rows:
             row.sort(key=lambda s: (s.pos_x if s.pos_x is not None else 0, s.label))
 
         return rows
 
     @classmethod
-    def get_insertion_coords(
-        cls, slots: list[PluginSlot], index: int | None = None
-    ) -> tuple[float, float]:
+    def get_insertion_coords(cls, slots: list[PluginSlot], index: int | None = None) -> tuple[float, float]:
         """
-        Розраховує координати на основі візуальних рядів (кластерів).
+        Calculate coordinates based on visual rows (clusters).
         """
         rows = cls.get_clustered_rows(slots)
 
-        # 1. Якщо немає слотів або вставка в самий кінець
+        # 1. If no slots or insertion at the very end
         if not rows or index is None or index >= sum(len(r) for r in rows):
             row_idx = len(rows) - 1 if rows else 0
-            # Беремо останній ряд
+            # Take the last row
             target_row = rows[-1] if rows else []
 
-            # Якщо останній ряд не порожній, ставимо ПРАВОРУЧ від останнього
+            # If last row is not empty, place TO THE RIGHT of the last
             if target_row:
                 x = cls.BASE_X + len(target_row) * cls.X_STEP
                 y = cls.BASE_Y + (len(rows) - 1) * cls.Y_STEP
@@ -392,7 +391,7 @@ class GridLayoutManager:
 
             return (float(x), float(y))
 
-        # 2. Якщо вставка всередині (пошук конкретного ряду та колонки)
+        # 2. If insertion inside (find specific row and column)
         current_idx = 0
         for row_idx, row_slots in enumerate(rows):
             if current_idx <= index < current_idx + len(row_slots):
@@ -406,7 +405,7 @@ class GridLayoutManager:
 
     @classmethod
     def get_new_row_coords(cls, slots: list[PluginSlot]) -> tuple[float, float]:
-        """Повертає координати для початку нового ряду (нижче всіх існуючих)."""
+        """Return coordinates for starting a new row (below all existing)."""
         rows = cls.get_clustered_rows(slots)
         return (float(cls.BASE_X), float(cls.BASE_Y + len(rows) * cls.Y_STEP))
 
@@ -418,72 +417,105 @@ class GridLayoutManager:
 
 class RoutingManager:
     """
-    Stateless manager для розрахунку з'єднань у графі.
-    Не керує станом, лише повертає набори портів.
+    Stateless manager for calculating connections in the graph.
+    Does not manage state, only returns port sets.
     """
+
+    @classmethod
+    def _grouped_pairs(cls, outputs: list[str], inputs: list[str]) -> list[tuple[str, str]]:
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        pairs = []
+
+        if n_out >= n_in:
+            # many outputs -> group to inputs
+            for o_idx, out in enumerate(outputs):
+                i_idx = int(o_idx * n_in / n_out)
+                pairs.append((out, inputs[i_idx]))
+        else:
+            # many inputs -> group to outputs
+            for i_idx, inp in enumerate(inputs):
+                o_idx = int(i_idx * n_out / n_in)
+                pairs.append((outputs[o_idx], inp))
+
+        return pairs
 
     @classmethod
     def get_connection_pairs(
         cls,
         inputs: list[str],
         outputs: list[str],
-        joid_inputs: bool,
-        joid_outputs: bool,
+        join_inputs: bool,
+        join_outputs: bool,
     ):
         if not outputs or not inputs:
             return []
 
+        n_out = len(outputs)
+        n_in = len(inputs)
+
+        # --- AUTO JOIN RULE ---
+        # If parity mismatches (odd ↔ even), force join
+        if (n_out % 2) != (n_in % 2):
+            join_inputs = True
+            join_outputs = True
+
         connections = []
 
-        if joid_inputs or joid_outputs:
-            # All-to-all: кожен вихід з кожним входом
+        if join_inputs or join_outputs:
+            # All-to-all: each output to each input
             for out in outputs:
                 for inp in inputs:
                     connections.append((out, inp))
         else:
-            # Pair-by-index: 1-1, 2-2, а надлишок до останнього
-            for i, out in enumerate(outputs):
-                in_idx = min(i, len(inputs) - 1)
-                connections.append((out, inputs[in_idx]))
+            # # Pair-by-index: 1-1, 2-2, and excess to last
+            # for i, out in enumerate(outputs):
+            #     in_idx = min(i, len(inputs) - 1)
+            #     connections.append((out, inputs[in_idx]))
 
-            if len(inputs) > len(outputs):
-                last_out = outputs[-1]
-                for inp in inputs[len(outputs) :]:
-                    connections.append((last_out, inp))
+            # if len(inputs) > len(outputs):
+            #     last_out = outputs[-1]
+            #     for inp in inputs[len(outputs) :]:
+            #         connections.append((last_out, inp))
+            connections.extend(cls._grouped_pairs(outputs, inputs))
 
         return connections
 
     @classmethod
-    def get_audio_connection_pairs(
-        cls, src: AnySlot, dst: AnySlot
-    ) -> list[tuple[str, str]]:
-        """Розраховує пари (вихід, вхід) між двома слотами."""
+    def get_audio_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
+        """Calculate (output, input) pairs between two slots."""
         outputs = src.audio_outputs
         inputs = dst.audio_inputs
 
-        # Визначаємо прапори об'єднання (join)
-        join_audio_outputs = src.join_audio_outputs
-        join_audio_inputs = dst.join_audio_inputs
+        # Determine join flags
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
-        return cls.get_connection_pairs(
-            inputs, outputs, join_audio_inputs, join_audio_outputs
-        )
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
-    def get_midi_connection_pairs(
-        cls, src: AnySlot, dst: AnySlot
-    ) -> list[tuple[str, str]]:
-        """Розраховує пари (вихід, вхід) між двома слотами."""
+    def get_midi_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
+        """Calculate (output, input) pairs between two slots."""
         outputs = src.midi_outputs
         inputs = dst.midi_inputs
-        print("MIDI!", inputs, outputs)
-        # Визначаємо прапори об'єднання (join)
-        join_midi_outputs = True  # src.join_midi_outputs
-        join_midi_inputs = True  # dst.join_midi_inputs
+        # Determine join flags
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
 
-        return cls.get_connection_pairs(
-            inputs, outputs, join_midi_inputs, join_midi_outputs
-        )
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
+
+    @classmethod
+    def get_cv_connection_pairs(cls, src: AnySlot, dst: AnySlot) -> list[tuple[str, str]]:
+        """Calculate (output, input) pairs between two slots."""
+        outputs = src.cv_outputs
+        inputs = dst.cv_inputs
+
+        # Determine join flags
+        join_outputs = src.join_outputs
+        join_inputs = dst.join_inputs
+
+        return cls.get_connection_pairs(inputs, outputs, join_inputs, join_outputs)
 
     @classmethod
     def calculate_chain_connections(
@@ -492,20 +524,16 @@ class RoutingManager:
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
         mode: RoutingMode = RoutingMode.HARD_BYPASS,
-    ) -> set[tuple[str, str]]:
+    ) -> set[tuple[str, str]] | None:
         match mode:
             case RoutingMode.HARD_BYPASS:
-                return cls._calculate_hard_bypass_connections(
-                    slots, input_slot, output_slot
-                )
-            case RoutingMode.DUAL_TRACK:
-                return cls._calculate_dual_track_connections(
-                    slots, input_slot, output_slot
-                )
+                return cls._calculate_hard_bypass_connections(slots, input_slot, output_slot)
+            case RoutingMode.TRIPPLE_TRACK:
+                return cls._calculate_tripple_track_connections(slots, input_slot, output_slot)
             case RoutingMode.LINEAR:
-                return cls._calculate_dual_track_connections(
-                    slots, input_slot, output_slot
-                )
+                return cls._calculate_tripple_track_connections(slots, input_slot, output_slot)
+            case RoutingMode.PATCHBAY:
+                return None
             case _:
                 raise ValueError("Unsupported routing mode")
 
@@ -516,15 +544,18 @@ class RoutingManager:
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
     ) -> set[tuple[str, str]]:
-        """Повертає повний набір бажаних з'єднань для всього ланцюга."""
+        """Return full set of desired connections for the entire chain."""
         desired = set()
         chain = [input_slot] + slots + [output_slot]
 
         for i in range(len(chain) - 1):
             audio_pairs = cls.get_audio_connection_pairs(chain[i], chain[i + 1])
             midi_pairs = cls.get_midi_connection_pairs(chain[i], chain[i + 1])
+            cv_pairs = cls.get_cv_connection_pairs(chain[i], chain[i + 1])
+
             desired.update(audio_pairs)
             desired.update(midi_pairs)
+            desired.update(cv_pairs)
 
         return desired
 
@@ -535,66 +566,93 @@ class RoutingManager:
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
     ) -> set[tuple[str, str]]:
-        """Повертає повний набір з'єднань, прокидаючи сигнал крізь несумісні слоти."""
+        """Return full set of connections, passing signal through incompatible slots."""
         desired = set()
         chain = [input_slot] + slots + [output_slot]
 
         for i in range(len(chain)):
             src = chain[i]
 
-            # --- Робота з AUDIO ---
+            # --- AUDIO processing ---
             if src.audio_outputs:
-                # Шукаємо наступний слот, у якого є хоча б один audio_input
+                # Find next slot that has at least one audio_input
                 for j in range(i + 1, len(chain)):
                     dst = chain[j]
                     if dst.audio_inputs:
                         audio_pairs = cls.get_audio_connection_pairs(src, dst)
                         desired.update(audio_pairs)
-                        break  # Знайшли споживача, далі не йдемо
+                        # Stop only if dst can continue the chain
+                        # (has outputs or is the final HW_OUT)
+                        if dst.audio_outputs or dst is output_slot:
+                            break
+                        # Otherwise continue searching - signal must pass further
 
-            # --- Робота з MIDI ---
+            # --- MIDI processing ---
             if src.midi_outputs:
-                # Шукаємо наступний слот, у якого є хоча б один midi_input
+                # Find next slot that has at least one midi_input
                 for j in range(i + 1, len(chain)):
                     dst = chain[j]
                     if dst.midi_inputs:
                         midi_pairs = cls.get_midi_connection_pairs(src, dst)
                         desired.update(midi_pairs)
-                        break  # Знайшли споживача, далі не йдемо
+                        # Same for MIDI
+                        if dst.midi_outputs or dst is output_slot:
+                            break
+
+            # --- CV processing ---
+            if src.cv_outputs:
+                # Find next slot that has at least one cv_input
+                for j in range(i + 1, len(chain)):
+                    dst = chain[j]
+                    if dst.cv_inputs:
+                        cv_pairs = cls.get_cv_connection_pairs(src, dst)
+                        desired.update(cv_pairs)
+                        # Same for CV
+                        if dst.cv_outputs or dst is output_slot:
+                            break
 
         return desired
 
     @classmethod
-    def _calculate_dual_track_connections(
+    def _calculate_tripple_track_connections(
         cls,
         slots: list[PluginSlot],
         input_slot: HardwareSlot,
         output_slot: HardwareSlot,
     ) -> set[tuple[str, str]]:
         """
-        Режим DUAL_TRACK: Сигнали йдуть паралельними магістралями.
-        Аудіо-ланцюг будується тільки через аудіо-плагіни.
-        Міді-ланцюг будується тільки через міді-плагіни.
+        TRIPPLE_TRACK mode: Signals go through parallel tracks.
+        Audio chain is built only through audio plugins.
+        MIDI chain is built only through MIDI plugins.
+        CV chain is built only through CV plugins.
         """
         desired = set()
         full_chain = [input_slot] + slots + [output_slot]
 
-        # 1. Формуємо аудіо-магістраль
+        # 1. Form audio track
         audio_nodes = [s for s in full_chain if s.audio_inputs or s.audio_outputs]
         for i in range(len(audio_nodes) - 1):
-            src, dst = audio_nodes[i], audio_nodes[i+1]
-            # З'єднуємо, якщо є що і куди з'єднувати
+            src, dst = audio_nodes[i], audio_nodes[i + 1]
+            # Connect if there's something to connect
             if src.audio_outputs and dst.audio_inputs:
                 desired.update(cls.get_audio_connection_pairs(src, dst))
 
-        # 2. Формуємо міді-магістраль
+        # 2. Form MIDI track
         midi_nodes = [s for s in full_chain if s.midi_inputs or s.midi_outputs]
         for i in range(len(midi_nodes) - 1):
-            src, dst = midi_nodes[i], midi_nodes[i+1]
+            src, dst = midi_nodes[i], midi_nodes[i + 1]
             if src.midi_outputs and dst.midi_inputs:
                 desired.update(cls.get_midi_connection_pairs(src, dst))
 
+        # 3. Form CV track
+        cv_nodes = [s for s in full_chain if s.cv_inputs or s.cv_outputs]
+        for i in range(len(cv_nodes) - 1):
+            src, dst = cv_nodes[i], cv_nodes[i + 1]
+            if src.cv_outputs and dst.cv_inputs:
+                desired.update(cls.get_cv_connection_pairs(src, dst))
+
         return desired
+
 
 # =============================================================================
 # Orchestrator
@@ -602,25 +660,50 @@ class RoutingManager:
 
 
 class OrchestratorMode(Enum):
-    OBSERVER = auto()  # Тільки дивиться
-    MANAGER = auto()  # Вирівнює автоматично
+    OBSERVER = auto()  # Only watches
+    MANAGER = auto()  # Aligns automatically
 
 
 class Orchestrator:
     def __init__(
-        self, config: Config, mode: OrchestratorMode = OrchestratorMode.MANAGER
+        self,
+        server_url: str | None = None,
+        config: Config | None = None,
+        mode: OrchestratorMode = OrchestratorMode.MANAGER,
     ):
         self.mode = mode
-        self.config = config
-        self.client = Client(config.server.url)
+        self.client = Client(server_url)
 
-        # TODO: fetch config from server
-        # self._fetch_config()
+        # Try to fetch config from server if not provided or empty
+        if config is None or not config.plugins:
+            fetched = self._fetch_config()
+            if fetched:
+                config = (
+                    fetched
+                    if config is None
+                    else Config(
+                        hardware=config.hardware,
+                        rack=config.rack,
+                        plugins=fetched.plugins,
+                    )
+                )
+
+        # Fail if no plugins configured
+        if config is None or not config.plugins:
+            raise ValueError(
+                "No plugins configured. Provide a config file with [[plugins]] "
+                "or ensure MODEP file server is available at port 8081."
+            )
+        self.config = config
+
+        # Installed plugins cache (from server)
+        self.installed_plugins: list[dict] = self.client.effect_list()
 
         # Locks and flags
         self._lock = threading.RLock()
         self._reorder_timer: threading.Timer | None = None
-        self._debounce_delay: float = 0.1
+        self._reconnect_timer: threading.Timer | None = None
+        self._debounce_delay: float = DEFAULT_DEBOUNCE_DELAY
         self._loading = True
         self._normalizing = False
 
@@ -628,20 +711,40 @@ class Orchestrator:
         self._order_change_listeners: set[OnRackOrderChangeCallbackRef] = set()
 
         # Slots and connections cache
-        self.input_slot = HardwareSlot(
-            direction=PortDirection.INPUT, config=config.hardware
-        )
-        self.output_slot = HardwareSlot(
-            direction=PortDirection.OUTPUT, config=config.hardware
-        )
+        self.input_slot = HardwareSlot(direction=PortDirection.INPUT, config=self.config.hardware)
+        self.output_slot = HardwareSlot(direction=PortDirection.OUTPUT, config=self.config.hardware)
         self.slots: list[PluginSlot] = []
         self._connections: set[tuple[str, str]] = set()
 
         self._subscribe()
 
-    def _fetch_config(self):
-        data = self.client.download_file("rack/config.toml")
-        Config.parse(data.decode())
+    def _fetch_config(self) -> Config | None:
+        """Try to fetch config from MODEP file server (port 8081).
+
+        Note: Only works with MODEP, not standard MOD-UI.
+        """
+        try:
+            data = self.client.download_file("rack/config.toml")
+            return Config.parse(data.decode())
+        except Exception as err:
+            _log.error("[ORCHESTRATOR] Could not fetch config from server: %s", err)
+            return None
+
+    def refresh_installed_plugins(self) -> list[dict]:
+        """Refresh the installed plugins cache from server."""
+        self.installed_plugins = self.client.effect_list()
+        return self.installed_plugins
+
+    def lookup_installed(self, uri: str) -> dict | None:
+        """Find an installed plugin by URI in cache."""
+        for plugin in self.installed_plugins:
+            if plugin.get("uri") == uri:
+                return plugin
+        return None
+
+    def list_installed_plugins(self) -> list[dict]:
+        """Return cached list of installed plugins."""
+        return self.installed_plugins
 
     @property
     def normalizing(self):
@@ -683,15 +786,15 @@ class Orchestrator:
     def _on_loading_start(self, event: LoadingStartEvent):
         with self._lock:
             if not self._loading:
-                _Color.red("\u25a0 Reloading detected")
-            _Color.yellow("\u25f7 Loading start, initializing...")
+                _cp.red("\u25a0 Reloading detected")
+            _cp.yellow("\u25f7 Loading start, initializing...")
             self._loading = True
             self._normalizing = False
             self.slots.clear()
             self._connections.clear()
 
     def _on_loading_end(self, event: LoadingEndEvent):
-        _Color.info("\u25cf Loading end, monitoring...")
+        _cp.green("\u25cf Loading end, monitoring...")
         with self._lock:
             self._loading = False
         if not self._loading:
@@ -712,34 +815,50 @@ class Orchestrator:
         Handle hardware port added via WebSocket feedback.
         Updates hardware slots.
         """
-        _Color.blue(f"+ HW {event.port_type.name} {event.direction.name}: {event.name}")
+        _cp.blue(f"+ HW {event.port_type} {event.direction}: {event.symbol}, {event.name}, {event.index}")
 
-        if event.port_type not in {PortType.AUDIO, PortType.MIDI}:
-            return
+        match event.direction:
+            case PortDirection.INPUT:
+                slot = self.input_slot
+            case PortDirection.OUTPUT:
+                slot = self.output_slot
+            case _:
+                return
 
-        if event.direction not in {PortDirection.INPUT, PortDirection.OUTPUT}:
-            return
+        match event.port_type:
+            case PortType.AUDIO:
+                ports_list = slot.audio_ports
+            case PortType.MIDI:
+                ports_list = slot.midi_ports
+            case PortType.CV:
+                ports_list = slot.cv_ports
+            case _:
+                return
 
-        hw_config = self.config.hardware
+        disable_ports = self.config.hardware.disable_ports
 
-        if event.direction == PortDirection.OUTPUT:
-            slot = self.output_slot
-        else:
-            slot = self.input_slot
-
-        if event.port_type == PortType.AUDIO:
-            ports_list = slot.audio_ports
-        else:
-            ports_list = slot.midi_ports
-
-        if event.name not in hw_config.disable_ports:
-            if event.name not in ports_list:
-                ports_list.append(event.name)
+        if event.symbol not in disable_ports:
+            if event.symbol not in ports_list:
+                ports_list.insert(event.index, event.symbol)
 
         self._schedule_reorder()
 
     def _on_graph_hw_port_remove(self, event: GraphRemoveHwPortEvent):
-        # TODO: handle this event
+        """Handle hardware port removal via WebSocket feedback."""
+        _cp.red(f"- HW port: {event.symbol}")
+
+        # Event only has name, no type/direction — search in both slots and both lists
+        for slot in (self.input_slot, self.output_slot):
+            if event.symbol in slot.audio_ports:
+                slot.audio_ports.remove(event.symbol)
+                break
+            if event.symbol in slot.midi_ports:
+                slot.midi_ports.remove(event.symbol)
+                break
+            if event.symbol in slot.cv_ports:
+                slot.cv_ports.remove(event.symbol)
+                break
+
         self._schedule_reorder()
 
     def _on_graph_plugin_add(self, event: GraphPluginAddEvent):
@@ -747,12 +866,13 @@ class Orchestrator:
         Handle plugin added via WebSocket feedback.
         Creates Slot, fetches port info, connects to chain.
         """
-        _Color.blue(f"+ Plugin: {event.label}")
+        _cp.blue(f"+ Plugin: {event.label}")
 
-        # Перевіряємо чи такий слот вже існує
+        # Check if such slot already exists
         slot = self.get_slot_by_label(event.label)
         if not slot:
             # Just update position
+
             plugin = Plugin.load_supported(
                 self.client,
                 uri=event.uri,
@@ -761,13 +881,15 @@ class Orchestrator:
             )
 
             if not plugin:
-                _Color.red(f"Can not load plugin: {event.label}, {event.uri}")
-                # TODO: maybe should remove it
-                # with self._lock:
-                #     self.client.effect_remove(event.label)
+                _cp.red(f"Can not load plugin: {event.label}, {event.uri}", logging.WARNING)
+                # Defer removal - server may not be ready yet
+                threading.Timer(
+                    DEFAULT_DEBOUNCE_DELAY,
+                    lambda: self.client.effect_remove(event.label),
+                ).start()
                 return
 
-            # Створюємо слот
+            # Create slot
             slot = PluginSlot(
                 plugin,
                 event.x if event.x is not None else 0,
@@ -775,7 +897,7 @@ class Orchestrator:
             )
 
         with self._lock:
-            # Додаємо слот
+            # Add slot
             self.slots.append(slot)
 
         if not self._loading:
@@ -786,7 +908,7 @@ class Orchestrator:
         Handle plugin removed via WebSocket feedback.
         Updates local graph state ONLY.
         """
-        _Color.red(f"- Plugin: {event.label}")
+        _cp.red(f"- Plugin: {event.label}")
 
         slot = self.get_slot_by_label(event.label)
         if not slot:
@@ -794,28 +916,38 @@ class Orchestrator:
 
         with self._lock:
             self.slots.remove(slot)
-            print(f"  Removed slot: {event.label}")
+            _log.debug("[ORCHESTRATOR] Removed slot: %s", event.label)
 
         if not self._loading:
             self._schedule_reorder(force_emit=True)
 
     def _on_graph_connect(self, event: GraphConnectEvent):
-        _Color.blue(f"\u221e Connected: {event.src_path} \u21e2 {event.dst_path}")
+        _cp.blue(f"\u221e Connected: {event.src_path} \u21e2 {event.dst_path}")
         with self._lock:
             pair = (event.src_path, event.dst_path)
             if pair not in self._connections:
                 self._connections.add(pair)
-                print(f"[Cache] Connected: {event.src_path} -> {event.dst_path}")
+                _log.debug(
+                    "[ORCHESTRATOR] [Cache] Connected: %s -> %s",
+                    event.src_path,
+                    event.dst_path,
+                )
+                self._schedule_reconnect()
 
     def _on_graph_disconnect(self, event: GraphDisconnectEvent):
-        _Color.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
+        _cp.red(f"\u22b6 Disconnected: {event.src_path} \u2307 {event.dst_path}")
         with self._lock:
             pair = (event.src_path, event.dst_path)
             self._connections.discard(pair)
-            print(f"[Cache] Disconnected: {event.src_path} -> {event.dst_path}")
+            _log.debug(
+                "[ORCHESTRATOR] [Cache] Disconnected: %s -> %s",
+                event.src_path,
+                event.dst_path,
+            )
+            self._schedule_reconnect()
 
     def _on_position_change(self, event: GraphPluginPosEvent):
-        _Color.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
+        _cp.yellow(f"\u2316 Pos: {event.label}, ({event.x}, {event.y})")
         """
         Handle position change from WebSocket.
         Updates slot position and reorders slots based on new coordinates.
@@ -828,14 +960,14 @@ class Orchestrator:
         with self._lock:
             x, y = (event.x, event.y)
             if slot.is_pos_changed((x, y)):
-                _Color.yellow(f"\u21bb Syncing pos: {slot.label} to {(x, y)}")
+                _cp.yellow(f"\u21bb Syncing pos: {slot.label} to {(x, y)}")
                 slot.pos_x = x
                 slot.pos_y = y
 
         if not self._loading and not self.normalizing:
             self._schedule_reorder()
 
-    def _normalize_layout(self, /, force: bool = False):
+    def _normalize_layout(self, *, force: bool = False):
         if self._loading:
             return
 
@@ -845,29 +977,27 @@ class Orchestrator:
         if self.mode != OrchestratorMode.MANAGER and not force:
             return
 
-        _Color.info("\u21bb Normalization...")
+        _cp.green("\u21bb Normalization...")
         new_positions = GridLayoutManager.normalize(self.slots)
         self._request_update_positions(new_positions)
 
-    def _request_update_positions(
-        self, positions: dict[PluginSlot, tuple[float, float]]
-    ):
+    def _request_update_positions(self, positions: dict[PluginSlot, tuple[float, float]]):
         self.normalizing = True
         try:
             for slot, (x, y) in positions.items():
                 old_pos = (slot.pos_x, slot.pos_y)
-                _Color.yellow(f"\u21c5 Updating pos: {old_pos} -> {(x, y)}")
+                _cp.yellow(f"\u21c5 Updating pos: {old_pos} -> {(x, y)}")
                 if slot.is_pos_changed((x, y)):
                     slot.pos_x = x
                     slot.pos_y = y
                     self.client.effect_position(slot.label, x, y)
         except Exception as err:
-            _Color.red(f"\u21c5 Updating pos: error occured: {err}")
+            _cp.red(f"\u21c5 Updating pos: error occured: {err}", logging.ERROR)
         finally:
             with self._lock:
                 self.normalizing = False
 
-    def _reorder_slots_by_pos(self, /, force_emit=False):
+    def _reorder_slots_by_pos(self, *, force_emit=False):
         with self._lock:
             # sort slots by pos
             old_order = [s.label for s in self.slots]
@@ -880,14 +1010,25 @@ class Orchestrator:
         with self._lock:
             # check order changed
             if old_order != new_order or force_emit or (not self.slots and old_order):
-                self.reconnect_seamless()
+                self._schedule_reconnect()
                 self._order_changed_emit()
 
-    def _schedule_reorder(self, /, force_emit: bool = False):
+    def _schedule_reconnect(self):
+        if self._reconnect_timer:
+            self._reconnect_timer.cancel()
+
+        self._reconnect_timer = threading.Timer(
+            self._debounce_delay,
+            self.reconnect_seamless,
+        )
+
+        self._reconnect_timer.start()
+
+    def _schedule_reorder(self, *, force_emit: bool = False):
         if self._reorder_timer:
             self._reorder_timer.cancel()
 
-        # Таймер викличе реордер в окремому потоці через 200мс спокою
+        # Timer will call reorder in separate thread after 200ms of quiet
         self._reorder_timer = threading.Timer(
             self._debounce_delay,
             self._reorder_slots_by_pos,
@@ -897,7 +1038,7 @@ class Orchestrator:
         self._reorder_timer.start()
 
     def _order_changed_emit(self):
-        _Color.info("\u21c5 Slots order changed")
+        _cp.green("\u21c5 Slots order changed")
         # then if order was changed process callbacks
         dead = set()
 
@@ -920,57 +1061,80 @@ class Orchestrator:
     # =========================================================================
 
     def reconnect_seamless(self):
-        """Синхронізує поточні з'єднання на сервері з розрахованим ідеалом."""
+        """Synchronize current connections on server with calculated ideal."""
         if self._loading:
             return
 
         if self.mode != OrchestratorMode.MANAGER:
             return
 
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         with self._lock:
-            # 1. Отримуємо "ідеальний" стан від менеджера
+            _cp.green("\u223f Calculating connections")
+
+            # 1. Get "ideal" state from manager
             desired = RoutingManager.calculate_chain_connections(
-                self.slots, self.input_slot, self.output_slot, self.config.rack.routing_mode
+                self.slots,
+                self.input_slot,
+                self.output_slot,
+                self.config.rack.routing_mode,
             )
 
-            # 2. Обчислюємо різницю з кешем Orchestrator
+            if not desired:
+                return
+
+            # 2. Calculate difference with Orchestrator cache
             to_connect = desired - self._connections
             to_disconnect = self._connections - desired
 
             if not to_connect and not to_disconnect:
                 return
 
-            _Color.info("--- Syncing Graph ---")
+            _cp.green("\u29c9 Syncing graph")
             for out_p, in_p in to_connect:
                 self.client.effect_connect(out_p, in_p)
 
             for out_p, in_p in to_disconnect:
                 self.client.effect_disconnect(out_p, in_p)
 
-        print("=== RECONNECT SEAMLESS DONE ===\n")
+        _cp.green("\u223f Routing done")
 
     def _connect_pair(self, src: AnySlot, dst: AnySlot):
-        """Проксі-метод для точкового з'єднання (наприклад, при видаленні плагіна)."""
+        """Proxy method for point connection (e.g., when removing a plugin)."""
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         pairs = RoutingManager.get_audio_connection_pairs(src, dst)
         for out_path, in_path in pairs:
-            # Важливо: ми не додаємо в self._connections самі, чекаємо WS події
+            # Important: we don't add to self._connections ourselves, wait for WS events
             self.client.effect_connect(out_path, in_path)
 
     def _disconnect_everything(self):
-        """Видаляє всі активні з'єднання, базуючись на актуальному кеші."""
+        """Remove all active connections based on current cache."""
+        if self.config.rack.routing_mode == RoutingMode.PATCHBAY:
+            return
+
         with self._lock:
             if not self._connections:
                 return
 
-            print(f"  Disconnecting everything: {len(self._connections)} connections")
+            _log.debug(
+                "[ORCHESTRATOR] Disconnecting everything: %s connections",
+                len(self._connections),
+            )
 
-            # Копіюємо для ітерації
+            # Copy for iteration
             current_pairs = list(self._connections)
             for out_path, in_path in current_pairs:
                 try:
                     self.client.effect_disconnect(out_path, in_path)
                 except Exception as e:
-                    _Color.red(f"Error disconnecting {out_path} -> {in_path}: {e}")
+                    _cp.red(
+                        f"\u22b6 Error disconnecting {out_path} -> {in_path}: {e}",
+                        logging.ERROR,
+                    )
 
     def clear(self):
         """Request removal of all plugins safely."""
@@ -978,18 +1142,18 @@ class Orchestrator:
             if not self.slots:
                 return
 
-            _Color.info("--- Clearing Rack ---")
+            _cp.red("\u232B Clearing Rack")
 
-            # 1. Зупиняємо моніторинг порядку на час масового видалення
-            # (необов'язково, але корисно мати прапор масової операції)
+            # 1. Stop order monitoring during mass removal
+            # (optional, but useful to have a mass operation flag)
 
-            # 2. Розірвати всі кабелі одним махом, щоб не було тріску
-            # при перепідключенні сусідів, які теж зараз зникнуть
+            # 2. Disconnect all cables at once to avoid crackling
+            # when reconnecting neighbors that will also disappear
             self._disconnect_everything()
 
-            # 3. Видаляємо плагіни.
-            # Використовуємо прямий виклик client, щоб уникнути
-            # зайвої логіки "сусідів" у request_remove_plugin
+            # 3. Remove plugins.
+            # Use direct client call to avoid
+            # extra "neighbor" logic in request_remove_plugin
             labels_to_remove = [slot.label for slot in self.slots]
 
             for label in labels_to_remove:
@@ -997,8 +1161,8 @@ class Orchestrator:
 
             self.client.reset()
 
-            # 4. Примусово оновлюємо стан, якщо хочемо миттєвої реакції
-            # Хоча WS-події прийдуть і самі запустять реордер.
+            # 4. Force update state if we want immediate reaction
+            # Although WS events will come and trigger reorder themselves.
 
 
 # =============================================================================
@@ -1008,21 +1172,24 @@ class Orchestrator:
 
 class Rack(Orchestrator):
     """
-    Rig — ланцюг ефектів: Input -> [Slot 0] -> [Slot 1] -> ... -> Output
+    Rig - effects chain: Input -> [Slot 0] -> [Slot 1] -> ... -> Output
 
-    Реактивна архітектура (Server-as-Source-of-Truth):
-    - Клієнт може ініціювати зміни через request_* методи
-    - Локальний стан змінюється ТІЛЬКИ у відповідь на WS feedback
+    Reactive architecture (Server-as-Source-of-Truth):
+    - Client can initiate changes via request_* methods
+    - Local state changes ONLY in response to WS feedback
     - WS handlers: _on_plugin_added(), _on_plugin_removed()
     """
 
     def __init__(
-        self, config: Config, mode: OrchestratorMode = OrchestratorMode.MANAGER
+        self,
+        server_url: str | None = None,
+        config: Config | None = None,
+        mode: OrchestratorMode = OrchestratorMode.MANAGER,
     ):
-        super().__init__(config=config, mode=mode)
+        super().__init__(server_url=server_url, config=config, mode=mode)
 
     # =========================================================================
-    # Request API (ініціювання без локальних змін)
+    # Request API (initiation without local changes)
     # =========================================================================
 
     @staticmethod
@@ -1044,11 +1211,11 @@ class Rack(Orchestrator):
             x, y: Position on MOD-UI
 
         Returns:
-            label якщо REST OK, None якщо помилка
+            label if REST OK, None if error
         """
         plugin_config = self.config.get_plugin_by_uri(uri)
         if not plugin_config:
-            print(f"Plugin not supported: {uri}")
+            _log.warning("[RACK] Plugin not supported: %s", uri)
             return None
 
         label = self._generate_label(uri)
@@ -1056,10 +1223,10 @@ class Rack(Orchestrator):
         result = self.client.effect_add(label, uri, x, y)
 
         if not result or not isinstance(result, dict) or not result.get("valid"):
-            print(f"REST error: Failed to add plugin {uri}")
+            _log.error("[RACK] Failed to add plugin: %s", uri)
             return None
 
-        print(f"REST OK: Requested add {label}, waiting for WS feedback")
+        _log.debug("[RACK] Requested add %s, waiting for WS feedback", label)
         return label
 
     def request_add_plugin_at(self, uri: str, insert_index: int) -> str | None:
@@ -1099,7 +1266,7 @@ class Rack(Orchestrator):
         """
         slot = self.get_slot_by_label(label)
         if not slot:
-            print(f"Plugin {label} not found locally, cannot remove")
+            _log.warning("[RACK] Plugin %s not found locally, cannot remove", label)
             return False
 
         idx = self.slots.index(slot)
@@ -1116,15 +1283,15 @@ class Rack(Orchestrator):
 
         # Pre-connect neighbors
         if src and dst:
-            print(f"Pre-connecting neighbors before removal: {src} -> {dst}")
+            _log.debug("[RACK] Pre-connecting neighbors before removal: %s -> %s", src, dst)
             self._connect_pair(src, dst)
 
         # Attempt removal
         success = self.client.effect_remove(label)
         if not success:
-            print(f"REST remove failed for {label}, doing seamless reconnect")
+            _log.debug("[RACK] Remove failed for %s, doing seamless reconnect", label)
         else:
-            print(f"REST OK: Requested remove {label}, waiting for WS feedback")
+            _log.debug("[RACK] Requested remove %s, waiting for WS feedback", label)
 
         return success
 
@@ -1145,12 +1312,12 @@ class Rack(Orchestrator):
         if from_idx == to_idx:
             return
 
-        print(f"Moving slot from idx {from_idx} to {to_idx}")
+        _log.debug("Moving slot from idx %s to %s", from_idx, to_idx)
 
         if self._loading:
             return
 
-        _Color.info("\u21c5 Reordering...")
+        _cp.green("\u21c5 Reordering...")
         new_positions = GridLayoutManager.move_slot(self.slots, from_idx, to_idx)
         self._request_update_positions(new_positions)
 

@@ -2,48 +2,54 @@ import sys
 import subprocess
 import os
 from pathlib import Path
+import argparse
+
+from mod_rack.logger import logger
 
 
 def main():
-    # Шлях до поточної директорії, де лежать gui.py та service.py
+    parser = argparse.ArgumentParser("mod-rack")
+
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    subparsers.add_parser("config", help="Generate config")
+    subparsers.add_parser("headless", help="Run headless service")
+    subparsers.add_parser("gui", help="Run gui")
+
+    ns, command_args = parser.parse_known_args()
+    command = ns.command
+
     base_path = Path(__file__).parent
 
-    # Визначаємо, чи хоче користувач запустити сервіс без графіки
-    # Ми перевіряємо аргументи вручну, щоб не "ковтати" їх для підпроцесів
-    is_headless = "--headless" in sys.argv
-
-    # Видаляємо наш службовий прапор --headless, щоб він не заважав іншим скриптам
-    filtered_args = [a for a in sys.argv[1:] if a != "--headless"]
-
-    # Логіка вибору скрипта
-    # Якщо примусово headless АБО якщо немає змінної DISPLAY (для Linux без X11)
-    if is_headless or (sys.platform == "linux" and not os.environ.get("DISPLAY")):
+    if command == "headless" or (
+        sys.platform == "linux" and not os.environ.get("DISPLAY")
+    ):
         target_script = base_path / "service.py"
         mode_name = "SERVICE (Headless)"
-    else:
+    elif command == "gui":
         target_script = base_path / "gui.py"
         mode_name = "GUI"
+    elif command == "config":
+        target_script = base_path / "config_gen.py"
+        mode_name = "CONFIG GEN"
+    else:
+        parser.error("unknown command")
 
     if not target_script.exists():
-        print(f"Error: {target_script.name} not found in {base_path}")
+        logger.error("%s not found in %s", target_script.name, base_path)
         sys.exit(1)
 
-    print(f"--- Starting MODEP Rack in {mode_name} mode ---")
+    logger.info("--- Starting MOD Rack in %s mode ---", mode_name)
 
-    # Формуємо команду для запуску
-    # Використовуємо sys.executable, щоб гарантувати використання того ж віртуального середовища
-    cmd = [sys.executable, str(target_script)] + filtered_args
+    cmd = [sys.executable, str(target_script)] + command_args
 
     try:
-        # Запускаємо процес.
-        # Використовуємо subprocess.run для service.py, щоб чекати завершення (Ctrl+C)
         subprocess.run(cmd, check=True)
     except KeyboardInterrupt:
-        # Обробка Ctrl+C на рівні головного процесу
+        # Ctrl+C handling
         pass
-    except subprocess.CalledProcessError as e:
-        print(f"\nProcess finished with error code: {e.returncode}")
-        sys.exit(e.returncode)
+    except subprocess.CalledProcessError as err:
+        logger.error("Process finished with error code: %s", err)
+        sys.exit(err.returncode)
 
 
 if __name__ == "__main__":

@@ -6,25 +6,25 @@ dict-like access to control parameters with automatic API synchronization.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Iterator
-
-from mod_rack.client import GraphParamSetBypassEvent, Client, GraphParamSetEvent
-from mod_rack.config import Config, PluginConfig
-from mod_rack.controls import ControlPort, parse_control_ports
+from operator import attrgetter
 
 
-__all__ = ["Port", "Plugin"]
+from mod_rack.mod_client import (
+    GraphOutputSetEvent,
+    GraphParamSetBypassEvent,
+    Client,
+    GraphParamSetEvent,
+)
+from mod_rack.schema.config import Config, PluginConfig
+from mod_rack.controls import PortControl, parse_control_ports
+
+from mod_rack.schema.effect import Effect, Port, Ports
+from mod_rack.logger import logger
+
+__all__ = ["Plugin"]
 
 
-@dataclass(frozen=True, slots=True)
-class Port:
-    """Audio/CV/MIDI port on a plugin."""
-
-    symbol: str
-    name: str
-    graph_path: str
+_log = logger.getChild(__name__)
 
 
 class Plugin:
@@ -41,171 +41,141 @@ class Plugin:
     """
 
     def __init__(
-        self, client: Client, uri: str, label: str, config: PluginConfig | None
+        self,
+        client: Client,
+        uri: str,
+        label: str,
+        config: PluginConfig | None = None,
+        *,
+        filter_gui_controls: bool = True,
     ):
         self.client = client
         self.uri = uri
         self.label = label
 
+        effect_data: dict = self.client.effect_get(self.uri)
+
         self._bypassed = False
-        self._config = config
-        self._controls: dict[str, ControlPort] = {}
+        self._config = config if config is not None else PluginConfig(name=self.name, uri=self.uri)
 
-        # io setup
-        self.audio_inputs: list[Port] = []
-        self.audio_outputs: list[Port] = []
-        self.midi_inputs: list[Port] = []
-        self.midi_outputs: list[Port] = []
+        self._effect = Effect.model_validate(effect_data)
 
-        # configuration
-        self.join_audio_inputs: bool = (
-            config.join_audio_inputs if config is not None else False
-        )
-        self.join_audio_outputs: bool = (
-            config.join_audio_outputs if config is not None else False
-        )
+        self.size: tuple[int, int] = self.client.effect_image_size(self.uri, "screenshot.png")
 
-        self._effect_data: dict = self.client.effect_get(self.uri)
-        self.name = self._effect_data.get("name", self.label)
-
-        self.size: tuple[int, int] = self.client.effect_image_size(
-            self.uri, "screenshot.png"
-        )
-        self._load_plugin_ports()
-        self._load_controls()
+        self._controls: dict[str, PortControl] = {}
+        self._load_controls(filter_gui_controls)
         self._subscribe()
 
-    def _subscribe(self):
-        self.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_change)
-        self.client.ws.on(GraphParamSetEvent, self._on_param_change)
+    @property
+    def name(self) -> str:
+        return self._effect.name
 
-    def _on_bypass_change(self, event: GraphParamSetBypassEvent):
+    @property
+    def join_inputs(self) -> bool:
+        return self._config.join_inputs
+
+    @property
+    def join_outputs(self) -> bool:
+        return self._config.join_outputs
+
+    @property
+    def ports(self) -> Ports:
+        return self._effect.ports
+
+    @property
+    def audio_inputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.audio.input)
+
+    @property
+    def audio_outputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.audio.output)
+
+    @property
+    def midi_inputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.midi.input)
+
+    @property
+    def midi_outputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.midi.output)
+
+    @property
+    def cv_inputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.cv.input)
+
+    @property
+    def cv_outputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.cv.output)
+
+    @property
+    def control_inputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.control.input)
+
+    @property
+    def control_outputs(self) -> list[Port]:
+        return self._filter_and_sort_ports(self._effect.ports.control.output)
+
+    def _graph_path(self, port: Port | None) -> str:
+        if port is None:
+            return self.label
+        return f"{self.label}/{port.symbol}"
+
+    def _filter_and_sort_ports(self, ports: list[Port]):
+        disabled = set(self._config.disable_ports)  # O(1) lookup instead of O(n)
+        return sorted(
+            (p for p in ports if p.symbol not in disabled),
+            key=attrgetter("index"),  # faster than lambda
+        )
+
+    def _subscribe(self) -> None:
+        self.client.ws.on(GraphParamSetBypassEvent, self._on_bypass_change)
+        self.client.ws.on(GraphParamSetEvent, self._on_control_change)
+        self.client.ws.on(GraphOutputSetEvent, self._on_control_change)
+
+    def _on_bypass_change(self, event: GraphParamSetBypassEvent) -> None:
         if self.label == event.label:
             self._bypassed = event.bypassed
 
-    def _on_param_change(self, event: GraphParamSetEvent):
+    def _on_control_change(self, event: GraphParamSetEvent | GraphOutputSetEvent) -> None:
         if self.label == event.label and event.symbol in self.controls:
             self.set_cached_value(event.symbol, event.value)
 
     @classmethod
     def load_supported(
-        cls, client: Client, uri: str, label: str, config: Config
+        cls,
+        client: Client,
+        uri: str,
+        label: str,
+        config: Config,
     ) -> Plugin | None:
-        # Перевіряємо whitelist
+        # Check whitelist
         plugin_config = config.get_plugin_by_uri(uri)
         if not plugin_config:
-            print(f"  Plugin {uri} not in whitelist, ignoring")
+            _log.warning("[PLUGIN] Plugin not in whitelist, ignoring: %uri", uri)
             return None
 
         plugin = cls(
-            client=client,  # Буде встановлено після створення Slot
+            client=client,  # Will be set after Slot creation
             uri=uri,
             label=label,
             config=plugin_config,
+            filter_gui_controls=config.rack.filter_gui_controls,
         )
         return plugin
 
-    def _load_plugin_ports(self) -> None:
+    def _load_controls(self, filter_gui_controls: bool = False) -> None:
         """Load and filter plugin ports from effect data.
-
-        Args:
-            label: Plugin label for graph paths
-            effect_data: Data from effect_get API
-
-        Returns:
-            Tuple of (inputs, outputs) Port lists
+        Load control metadata from effect_get response.
         """
         # Parse all ports from effect data
 
-        ports: dict = self._effect_data.get("ports", {})
-        audio_ports: dict = ports.get("audio", {})
-        midi_ports: dict = ports.get("midi", {})
-
-        config = self._config
-        label = self.label
-
-        for p in audio_ports.get("input", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.audio_inputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in audio_ports.get("output", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.audio_outputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in midi_ports.get("input", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.midi_inputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-        for p in midi_ports.get("output", []):
-            if config is not None and p["symbol"] in config.disable_ports:
-                continue
-            self.midi_outputs.append(
-                Port(
-                    symbol=p["symbol"],
-                    name=p.get("name", p["symbol"]),
-                    graph_path=f"{label}/{p['symbol']}",
-                )
-            )
-
-        print(
-            f"Parsed audio ports: inputs={self.audio_inputs}, outputs={self.audio_outputs}"
-        )
-        print(
-            f"Parsed midi ports: inputs={self.midi_inputs}, outputs={self.midi_outputs}"
-        )
-
-
-    def _load_controls(self) -> None:
-        """Load control metadata from effect_get response."""
-        controls = parse_control_ports(self._effect_data)
-        self._controls = {c.symbol: c for c in controls}
+        controls = parse_control_ports(self.label, self._effect, filter_gui_controls=filter_gui_controls)
+        self._controls = {c.symbol: c for c in sorted(controls, key=attrgetter("index"))}
 
     # --- Dict-like access to control values ---
 
     @property
-    def controls(self):
+    def controls(self) -> dict[str, PortControl]:
         return self._controls
-
-    def keys(self):
-        return self._controls.keys()
-
-    def values(self):
-        return self._controls.values()
-
-    def items(self):
-        return self._controls.items()
-
-    def __getitem__(self, symbol: str) -> ControlPort:
-        """Get current cached control value."""
-        if symbol not in self._controls:
-            raise KeyError(
-                f"Control '{symbol}' not found. Available: {list(self._controls.keys())}"
-            )
-        return self._controls[symbol]
-
-    def __contains__(self, symbol: str) -> bool:
-        return symbol in self._controls
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._controls)
 
     # --- Convenience methods ---
 
@@ -222,9 +192,7 @@ class Plugin:
     def param_set(self, symbol: str, value: float) -> bool:
         """Set parameter via Client API."""
         if symbol not in self._controls:
-            raise KeyError(
-                f"Control '{symbol}' not found. Available: {list(self._controls.keys())}"
-            )
+            raise KeyError(f"Control '{symbol}' not found. Available: {list(self._controls.keys())}")
 
         # Sync to API via POST
         self.client.ws.effect_param_set(self.label, symbol, value)

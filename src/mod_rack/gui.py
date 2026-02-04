@@ -1,18 +1,26 @@
 """
-PySide6 UI for MODEP Rack control.
+PySide6 UI for MOD Rack control.
 
 Run with: python qrack.py
 """
 
+import logging
 import signal
 import sys
-from pathlib import Path
 
-from mod_rack.client import GraphParamSetBypassEvent, GraphParamSetEvent
+from mod_rack.mod_client import (
+    GraphOutputSetEvent,
+    GraphParamSetBypassEvent,
+    GraphParamSetEvent,
+)
 from mod_rack.plugin import Plugin
-
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+from mod_rack.service import RackWSServer, get_argparser
+from mod_rack.schema.config import Config
+from mod_rack.rack import Rack
+from mod_rack.controls import PortControl
+from mod_rack.mod_client import PortDirection
+from mod_rack.rack import OrchestratorMode
+from mod_rack.logger import logger
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -37,8 +45,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
-from mod_rack import Config, Rack, ControlPort
-from mod_rack.rack import OrchestratorMode
+
+_log = logger.getChild(__name__)
 
 
 class ControlWidget(QWidget):
@@ -49,7 +57,7 @@ class ControlWidget(QWidget):
     # Ignore incoming WS updates for this duration after a local change
     LOCAL_CHANGE_COOLDOWN_MS = 100
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(parent)
         self.control = control
         self._local_change_timer = QTimer(self)
@@ -77,7 +85,7 @@ class KnobControl(ControlWidget):
 
     SLIDER_STEPS = 1000
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -128,7 +136,7 @@ class KnobControl(ControlWidget):
 class ToggleControl(ControlWidget):
     """Checkbox for toggle controls."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QHBoxLayout(self)
@@ -153,7 +161,7 @@ class ToggleControl(ControlWidget):
 class EnumControl(ControlWidget):
     """ComboBox for enumeration controls."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -199,7 +207,7 @@ class EnumControl(ControlWidget):
 class IntegerControl(ControlWidget):
     """Slider for integer controls (non-enum)."""
 
-    def __init__(self, control: ControlPort, parent=None):
+    def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
         layout = QVBoxLayout(self)
@@ -234,8 +242,37 @@ class IntegerControl(ControlWidget):
         self.value_label.setText(self.control.format_value(value))
 
 
-def create_control_widget(control: ControlPort, parent=None) -> ControlWidget:
+class MeterControl(ControlWidget):
+    """Read-only label for output controls (meters, indicators)."""
+
+    def __init__(self, control: PortControl, parent=None):
+        super().__init__(control, parent)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        # Name label
+        self.label = QLabel(control.name)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
+        # Value display (normalized 0.0-1.0)
+        normalized = control.normalize(control.value)
+        self.value_label = QLabel(f"{normalized:.2f}")
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(self.value_label)
+
+    def _set_widget_value(self, value: float):
+        normalized = self.control.normalize(value)
+        self.value_label.setText(f"{normalized:.2f}")
+
+
+def create_control_widget(control: PortControl, parent=None) -> ControlWidget:
     """Factory function to create appropriate widget for control type."""
+    # Output controls are read-only meters
+    if control.direction == PortDirection.OUTPUT:
+        return MeterControl(control, parent)
     if control.is_toggled:
         return ToggleControl(control, parent)
     if control.is_enumeration:
@@ -265,7 +302,7 @@ class PluginSelectorDialog(QDialog):
             uri = p_config.uri
             category = p_config.category or "General"
 
-            item = QListWidgetItem(f"{name}\n  [{category}]")
+            item = QListWidgetItem(f"{name}\n  [{', '.join(category)}]")
             item.setData(Qt.ItemDataRole.UserRole, uri)
             self.list_widget.addItem(item)
 
@@ -273,9 +310,7 @@ class PluginSelectorDialog(QDialog):
         layout.addWidget(self.list_widget)
 
         # Buttons
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -344,28 +379,24 @@ class SlotWidget(QFrame):
         menu = QMenu()
 
         replace_action = menu.addAction("Replace Plugin")
-        replace_action.triggered.connect(
-            lambda: self.replace_requested.emit(self.slot_label_id)
-        )
+        replace_action.triggered.connect(lambda: self.replace_requested.emit(self.slot_label_id))
 
         remove_action = menu.addAction("Remove Plugin")
-        remove_action.triggered.connect(
-            lambda: self.remove_requested.emit(self.slot_label_id)
-        )
+        remove_action.triggered.connect(lambda: self.remove_requested.emit(self.slot_label_id))
 
         menu.exec(self.mapToGlobal(pos))
 
     def mousePressEvent(self, event):
         # emit click and store drag start position
-        print(f"MOUSE_PRESS: label={self.slot_label_id} pos={event.pos()}")
+        _log.debug("MOUSE_PRESS: label=%s pos=%s", self.slot_label_id, event.position())
         self.clicked.emit(self.slot_label_id)
-        self._drag_start_pos = event.pos()
+        self._drag_start_pos = event.position()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton and self._drag_start_pos is not None:
-            distance = (event.pos() - self._drag_start_pos).manhattanLength()
-            print(f"MOUSE_MOVE: label={self.slot_label_id} distance={distance}")
+            distance = (event.position() - self._drag_start_pos).manhattanLength()
+            _log.debug("MOUSE_MOVE: label=%S distance=%s", self.slot_label_id, distance)
             if distance >= QApplication.startDragDistance():
                 from PySide6.QtGui import QDrag, QPixmap
                 from PySide6.QtCore import QMimeData
@@ -373,9 +404,7 @@ class SlotWidget(QFrame):
                 drag = QDrag(self)
                 mime = QMimeData()
                 # put both custom data and plain text for robustness
-                mime.setData(
-                    "application/x-slot-label", self.slot_label_id.encode("utf-8")
-                )
+                mime.setData("application/x-slot-label", self.slot_label_id.encode("utf-8"))
                 mime.setText(self.slot_label_id)
                 drag.setMimeData(mime)
 
@@ -384,12 +413,12 @@ class SlotWidget(QFrame):
                 self.render(pix)
                 drag.setPixmap(pix)
 
-                print(f"START_DRAG: label={self.slot_label_id}")
+                _log.debug("START_DRAG: label=%s", self.slot_label_id)
                 # change cursor to closed hand while dragging
                 QApplication.setOverrideCursor(Qt.ClosedHandCursor)
                 result = drag.exec(Qt.MoveAction)
                 QApplication.restoreOverrideCursor()
-                print(f"DRAG_RESULT: label={self.slot_label_id} result={result}")
+                _log.debug("DRAG_RESULT: label=%s result=%s", self.slot_label_id, result)
 
         super().mouseMoveEvent(event)
 
@@ -415,7 +444,7 @@ class SlotWidget(QFrame):
             else:
                 src_label = bytes(mime.data("application/x-slot-label")).decode("utf-8")
             # debug log
-            print(f"DROP_EVENT: src_label={src_label} dest_index={self.index}")
+            _log.debug("DROP_EVENT: src_label=%s dest_index=%s", src_label, self.index)
             # emit source label and this widget's index as destination
             self.dropped.emit(src_label, self.index)
             event.acceptProposedAction()
@@ -446,7 +475,7 @@ class ControlsPanel(QScrollArea):
         self.placeholder.setAlignment(Qt.AlignCenter)
         self._layout.addWidget(self.placeholder)
 
-    def set_plugin(self, plugin, label: str | None = None):
+    def set_plugin(self, plugin: Plugin | None, label: str | None = None):
         """Set the plugin to display controls for."""
         # Clear existing
         self._clear_controls()
@@ -482,25 +511,50 @@ class ControlsPanel(QScrollArea):
         self._layout.addWidget(line)
 
         # Controls grid
-        controls_group = QGroupBox("Controls")
-        grid = QGridLayout(controls_group)
+        # ================================
+        # OUTPUTS (top)
+        # ================================
+        outputs_group = QGroupBox("Outputs")
+        outputs_grid = QGridLayout(outputs_group)
 
-        row, col = 0, 0
+        out_row = out_col = 0
         max_cols = 3
 
-        for symbol in plugin:
-            control = plugin[symbol]
+        # ================================
+        # INPUTS (bottom)
+        # ================================
+        inputs_group = QGroupBox("Controls")
+        inputs_grid = QGridLayout(inputs_group)
+
+        in_row = in_col = 0
+
+        controls = plugin.controls.values()
+
+        for control in controls:
             widget = create_control_widget(control)
             widget.value_changed.connect(self._on_control_changed)
-            self.control_widgets[symbol] = widget
+            self.control_widgets[control.symbol] = widget
 
-            grid.addWidget(widget, row, col)
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
+            if control.direction == PortDirection.OUTPUT:
+                outputs_grid.addWidget(widget, out_row, out_col)
+                out_col += 1
+                if out_col >= max_cols:
+                    out_col = 0
+                    out_row += 1
+            else:
+                inputs_grid.addWidget(widget, in_row, in_col)
+                in_col += 1
+                if in_col >= max_cols:
+                    in_col = 0
+                    in_row += 1
 
-        self._layout.addWidget(controls_group)
+        # Add frames in correct order
+        if out_row or out_col:
+            self._layout.addWidget(outputs_group)
+
+        if in_row or in_col:
+            self._layout.addWidget(inputs_group)
+
         self._layout.addStretch()
 
     def _clear_controls(self):
@@ -563,10 +617,11 @@ class MainWindow(QMainWindow):
         self._param_changed_signal.connect(self._on_ws_param_changed)
         self._bypass_changed_signal.connect(self._on_ws_bypass_changed)
         self.rack.on_rack_order_changed(self._handle_rack_cb)
-        self.rack.client.ws.on(GraphParamSetEvent, self._forward_param_event)
+        self.rack.client.ws.on(GraphParamSetEvent, self._forward_control_event)
+        self.rack.client.ws.on(GraphOutputSetEvent, self._forward_control_event)
         self.rack.client.ws.on(GraphParamSetBypassEvent, self._forward_bypass_event)
 
-        self.setWindowTitle("MODEP Rack Controller")
+        self.setWindowTitle("MOD Rack Controller")
         self.setMinimumSize(800, 600)
 
         # Central widget
@@ -608,8 +663,8 @@ class MainWindow(QMainWindow):
         self.rack.client.ws.connect()
 
     def _handle_rack_cb(self, slots: list):
-        """Цей метод виконується у фоновому потоці Orchestrator."""
-        # Просто перекидаємо дані в головний потік через сигнал
+        """This method executes in background Orchestrator thread."""
+        # Just pass data to main thread via signal
         self.order_changed_signal.emit(slots)
 
     def _rebuild_slot_widgets(self):
@@ -666,21 +721,19 @@ class MainWindow(QMainWindow):
         """Add a new plugin (request via REST, wait for WS feedback)."""
         dialog = PluginSelectorDialog(self.rack, self)
         if dialog.exec() == QDialog.Accepted and dialog.selected_uri:
-            label = self.rack.request_add_plugin_at(
-                dialog.selected_uri, len(self.rack.slots)
-            )
+            label = self.rack.request_add_plugin_at(dialog.selected_uri, len(self.rack.slots))
             if label:
-                print(f"Requested add plugin, label={label}")
+                _log.debug("Requested add plugin, label=%s", label)
             else:
-                print("Failed to request add plugin")
+                _log.debug("Failed to request add plugin")
 
     def _on_remove_plugin(self, label: str):
         """Remove plugin (request via REST, wait for WS feedback)."""
         success = self.rack.request_remove_plugin(label)
         if success:
-            print(f"Requested remove plugin {label}")
+            _log.debug("Requested remove plugin %s", label)
         else:
-            print(f"Failed to request remove plugin {label}")
+            _log.debug("Failed to request remove plugin %s", label)
 
     def _on_replace_plugin(self, label: str):
         """Replace plugin - remove old, add new."""
@@ -707,13 +760,13 @@ class MainWindow(QMainWindow):
 
     def _on_slot_dropped(self, src_label: str, dest_index: int):
         """Handle drag-and-drop reorder: move src slot to dest index."""
-        print(f"ON_SLOT_DROPPED: src_label={src_label} dest_index={dest_index}")
+        _log.debug("ON_SLOT_DROPPED: src_label=%s dest_index=%s", src_label, dest_index)
         src_slot = self.rack.get_slot_by_label(src_label)
         if not src_slot:
             return
         from_idx = self.rack.slots.index(src_slot)
         to_idx = dest_index
-        print(f"ON_SLOT_DROPPED: from_idx={from_idx} to_idx={to_idx}")
+        _log.debug("ON_SLOT_DROPPED: from_idx=%s to_idx=%s", from_idx, to_idx)
         if from_idx == to_idx:
             return
         # Use rack.move_slot which handles reconnect
@@ -726,7 +779,7 @@ class MainWindow(QMainWindow):
     # WebSocket event handlers (thread-safe via Qt signals)
     # =========================================================================
 
-    def _forward_param_event(self, event: GraphParamSetEvent):
+    def _forward_control_event(self, event: GraphParamSetEvent | GraphOutputSetEvent):
         """Forward WS event to main thread via signal."""
         self._param_changed_signal.emit(event.label, event.symbol, event.value)
 
@@ -736,10 +789,7 @@ class MainWindow(QMainWindow):
 
     def _on_ws_param_changed(self, label: str, symbol: str, value: float):
         """Handle parameter change in main thread."""
-        if (
-            label == self.selected_label
-            and symbol in self.controls_panel.control_widgets
-        ):
+        if label == self.selected_label and symbol in self.controls_panel.control_widgets:
             widget = self.controls_panel.control_widgets[symbol]
             widget.set_value_silent(value)
 
@@ -750,39 +800,43 @@ class MainWindow(QMainWindow):
 
     def _on_rack_order_changed(self, order: list):
         """Handle order change from WebSocket - rebuild UI."""
-        print(f"UI: Order changed: {order}")
+        _log.debug("UI: Order changed: %s", order)
         self._rebuild_slot_widgets()
 
     def closeEvent(self, event):
         """Called when user closes window."""
-        print("Closing rack connection...")
+        _log.debug("Closing rack connection...")
         event.accept()
 
 
 def main():
-    # Load config
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
 
-    # Override server URL if needed
-    import argparse
+    parser = get_argparser()
+    ns = parser.parse_args()
 
-    parser = argparse.ArgumentParser(description="MODEP Rack Controller")
-    parser.add_argument("--server", "-s", default=None, help="MOD server URL")
-    parser.add_argument(
-        "--config", "-c", help="Config", type=Path, default="config.toml"
-    )
-    parser.add_argument("--slave", help="Slave", action="store_true")
-    args = parser.parse_args()
+    if ns.verbose:
+        logger.setLevel(logging.DEBUG)
 
-    config = Config.load(args.config)
+    config = Config.load(ns.config)
 
-    if args.server:
-        config.server.url = args.server
+    # IMPORTANT: Make sure RackWSServer is imported
+    # from your ws_server.py file
+    # from mod_rack.ws_server import RackWSServer
 
-    # Create rack (do not force reset on init — build state from WebSocket)
-    print("Connecting to MOD server...")
-    rack = Rack(
-        config, OrchestratorMode.OBSERVER if args.slave else OrchestratorMode.MANAGER
-    )
+    logger.info(f"Connecting to MOD server at {ns.server}...")
+
+    # You used the name Orchestrator in previous files
+    # If your class is named Rack, the logic remains the same
+    mode = OrchestratorMode.OBSERVER if ns.slave else OrchestratorMode.MANAGER
+    rack = Rack(ns.server, config, mode)
+
+    # Start WebSocket server if flag is set
+    if ns.rack_ws_port is not None:
+        logger.info("Starting Rack WebSocket server on port %s...", ns.rack_ws_port)
+        ws_server = RackWSServer(rack, port=ns.rack_ws_port)
+        ws_server.start()  # Starts in background thread
 
     # Create and run app
     app = QApplication(sys.argv)
@@ -792,18 +846,16 @@ def main():
 
     window = MainWindow(rack)
     title = window.windowTitle()
-    if args.slave:
-        window.setWindowTitle(title + " (SLAVE)")
-    else:
-        window.setWindowTitle(title + " (MASTER)")
+    window.setWindowTitle(f"{title} ({'SLAVE' if ns.slave else 'MASTER'})")
 
     window.show()
 
-    # Timer for Ctrl+C on Linux/Windows
+    # Timer for signal handling (Ctrl+C)
     timer = QTimer()
     timer.start(500)
     timer.timeout.connect(lambda: None)
 
+    # Start GUI event loop
     sys.exit(app.exec())
 
 

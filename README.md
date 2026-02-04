@@ -8,7 +8,7 @@ Python client for MODEP/MOD-UI audio plugin host.
 - WebSocket client for real-time parameter feedback
 - Reactive architecture (Server-as-Source-of-Truth)
 - Automatic audio and MIDI routing with smart channel pairing
-- Multiple routing modes (linear, hard_bypass, dual_track)
+- Multiple routing modes (linear, hard_bypass, tripple_track)
 - Plugin whitelist with port override support
 
 ## Architecture
@@ -86,7 +86,7 @@ This is useful for:
 The `routing_mode` parameter controls how audio and MIDI signals are routed through the plugin chain:
 
 - **`hard_bypass`** (default) — each output seeks the nearest next input of the same type; plugins without matching ports are bypassed. Audio and MIDI are routed independently.
-- **`dual_track`** — audio and MIDI form separate parallel chains. Audio-only plugins are skipped in the MIDI chain and vice versa.
+- **`tripple_track`** — audio and MIDI form separate parallel chains. Audio-only plugins are skipped in the MIDI chain and vice versa.
 - **`linear`** — strict sequential chain 1→2→3, connecting both audio and MIDI between adjacent slots.
 
 ### Audio Routing
@@ -104,18 +104,18 @@ When there are more inputs than outputs, the last output is duplicated to remain
 
 ### Join Mode (All-to-All Routing)
 
-For plugins that need all outputs connected to all inputs (e.g., mixers, splitters), use `join_audio_inputs` or `join_audio_outputs`:
+For plugins that need all outputs connected to all inputs (e.g., mixers, splitters), use `join_inputs` or `join_outputs`:
 
 ```toml
 [[plugins]]
 name = "Triple chorus"
 uri = "http://drobilla.net/plugins/fomp/triple_chorus"
 category = "modulator"
-join_audio_outputs = true  # All outputs connect to all inputs of next plugin
+join_outputs = true  # All outputs connect to all inputs of next plugin
 ```
 
-- `join_audio_outputs = true` on source plugin: all its outputs connect to all inputs of the next plugin
-- `join_audio_inputs = true` on destination plugin: all outputs from previous plugin connect to all its inputs
+- `join_outputs = true` on source plugin: all its outputs connect to all inputs of the next plugin
+- `join_inputs = true` on destination plugin: all outputs from previous plugin connect to all its inputs
 
 ### Hardware Port Auto-Detection
 
@@ -136,8 +136,8 @@ Similar join routing is available for hardware inputs/outputs:
 
 ```toml
 [hardware]
-join_audio_inputs = true   # All hardware inputs connect to all inputs of first plugin
-join_audio_outputs = true  # All outputs of last plugin connect to all hardware outputs
+join_inputs = true   # All hardware inputs connect to all inputs of first plugin
+join_outputs = true  # All outputs of last plugin connect to all hardware outputs
 ```
 
 This is useful for:
@@ -150,7 +150,7 @@ This is useful for:
 from mod_rack import Config, Orchestrator
 
 config = Config.load("config.toml")
-orch = Orchestrator(config)
+orch = Orchestrator("http://127.0.0.1:18181", config)
 
 # Request to add plugin (async - waits for WS feedback)
 label = orch.request_add_plugin("http://moddevices.com/plugins/mod-devel/DS1")
@@ -170,6 +170,11 @@ orch.move_slot(from_idx=0, to_idx=2)
 
 # Clear all plugins
 orch.clear()
+
+# Access installed plugins (cached from server)
+installed = orch.list_installed_plugins()
+plugin_info = orch.lookup_installed("http://moddevices.com/plugins/mod-devel/DS1")
+orch.refresh_installed_plugins()  # refresh cache
 ```
 
 ## API
@@ -185,11 +190,15 @@ orch.clear()
 
 ### Orchestrator
 
+- `Orchestrator(server_url, config=None)` - Create orchestrator with server URL and optional config
 - `orch.request_add_plugin(uri)` - Request to add plugin (returns label or None)
 - `orch.request_remove_plugin(label)` - Request to remove plugin (returns bool)
 - `orch.move_slot(from_idx, to_idx)` - Reorder slots in chain
 - `orch.get_slot_by_label(label)` - Find slot by label
 - `orch.clear()` - Request removal of all plugins
+- `orch.list_installed_plugins()` - List plugins installed on server (cached)
+- `orch.lookup_installed(uri)` - Find installed plugin by URI in cache
+- `orch.refresh_installed_plugins()` - Refresh installed plugins cache
 
 ### PluginSlot
 
