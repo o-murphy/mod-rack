@@ -125,7 +125,7 @@ class CableView(QWidget):
     slot_dropped = Signal(str, int)  # source_label, destination_index
 
     BOX_WIDTH = 44
-    BOX_HEIGHT = 88
+    BOX_HEIGHT = 66
     BOX_SPACING_MIN = 8
     BOX_SPACING_MAX = 40
     CABLE_HEIGHT = 4
@@ -696,13 +696,10 @@ class ToggleControl(ControlWidget):
     def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
         self.checkbox = QCheckBox(control.shortName)
         self.checkbox.setChecked(control.value >= 0.5)
         self.checkbox.stateChanged.connect(self._on_state_changed)
-        layout.addWidget(self.checkbox)
+        self.layout().addWidget(self.checkbox)
 
     def _on_state_changed(self, state):
         value = 1.0 if state == Qt.Checked else 0.0
@@ -1008,7 +1005,7 @@ class ControlsPanel(QScrollArea):
 
         for control in controls:
             widget = create_control_widget(control)
-            widget.setFixedSize(80, 120)
+            widget.setFixedSize(100, 120)
             widget.value_changed.connect(self._on_control_changed)
             self.control_widgets[control.symbol] = widget
 
