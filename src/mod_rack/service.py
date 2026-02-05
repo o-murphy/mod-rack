@@ -9,6 +9,7 @@ Run with: python -m mod_rack.ws_server
 import asyncio
 import json
 import logging
+import argparse
 
 # import sys
 import threading
@@ -29,13 +30,14 @@ from mod_rack.mod_client import DEFAULT_SERVER_URL
 from mod_rack.logger import logger
 
 
-__all__ = ["main", "get_argparser", "RackWSServer"]
+__all__ = ["main", "ArgNamespace", "get_argparser", "RackWSServer"]
 
 
 _log = logger.getChild(__name__)
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "config_example.toml"
+BASE_PATH = Path(__file__).parent
+DEFAULT_CONFIG_PATH = BASE_PATH / "assets" / "config_example.toml"
 
 
 def _serialize_control(ctrl: PortControl) -> dict:
@@ -287,9 +289,15 @@ class RackWSServer:
         self._loop.run_until_complete(self._run_server())
 
 
-def get_argparser():
-    import argparse
+class ArgNamespace(argparse.Namespace):
+    server: str
+    config: str
+    rack_ws_port: int
+    slave: bool
+    verbose: bool
 
+
+def get_argparser():
     parser = argparse.ArgumentParser(description="MOD Rack WebSocket Server")
     parser.add_argument("--server", "-s", default=DEFAULT_SERVER_URL, help="MOD server URL")
     parser.add_argument("--config", "-c", help="Config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -310,7 +318,7 @@ def get_argparser():
 
 def main():
     parser = get_argparser()
-    ns = parser.parse_args()
+    ns: ArgNamespace = parser.parse_args()
 
     if ns.verbose:
         logger.setLevel(logging.DEBUG)

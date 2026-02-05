@@ -9,7 +9,7 @@ try:
 except ImportError:
     import tomli as tomllib
 
-base_path = Path(__file__).parent
+BASE_PATH = Path(__file__).parent
 
 
 header_fmt = """###########################
@@ -59,7 +59,7 @@ class Args(argparse.Namespace):
 
 
 class _KnownPlugins:
-    PATH = base_path / "plugins.toml"
+    PATH = BASE_PATH / "assets" / "plugins.toml"
 
     def __init__(self):
         with open(self.PATH, "rb") as fp:

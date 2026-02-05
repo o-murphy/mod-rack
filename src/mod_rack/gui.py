@@ -8,6 +8,7 @@ import logging
 import re
 import signal
 import sys
+from pathlib import Path
 
 from mod_rack.mod_client import (
     GraphOutputSetEvent,
@@ -15,7 +16,7 @@ from mod_rack.mod_client import (
     GraphParamSetEvent,
 )
 from mod_rack.plugin import Plugin
-from mod_rack.service import RackWSServer, get_argparser
+from mod_rack.service import ArgNamespace, RackWSServer, get_argparser
 from mod_rack.schema.config import Config
 from mod_rack.rack import Rack
 from mod_rack.controls import PortControl
@@ -45,10 +46,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QRect, QSize, QPoint, QMimeData
-from PySide6.QtGui import QPainter, QColor, QPolygon, QPen, QFont, QDrag, QPixmap
+from PySide6.QtGui import QPainter, QColor, QPolygon, QPen, QFont, QDrag, QPixmap, QIcon
 
 
 _log = logger.getChild(__name__)
+
+BASE_PATH = Path(__file__).parent
+WINDOW_ICON_PATH = BASE_PATH / "assets" / "icon.ico"
 
 
 # Color mapping for plugin categories
@@ -1067,6 +1071,7 @@ class MainWindow(QMainWindow):
         self.rack.client.ws.on(GraphOutputSetEvent, self._forward_control_event)
         self.rack.client.ws.on(GraphParamSetBypassEvent, self._forward_bypass_event)
 
+        self.setWindowIcon(QIcon(WINDOW_ICON_PATH.as_posix()))
         self.setWindowTitle("MOD Rack Controller")
         self.setMinimumSize(800, 600)
 
@@ -1266,7 +1271,7 @@ class MainWindow(QMainWindow):
 
 def main():
     parser = get_argparser()
-    ns = parser.parse_args()
+    ns: ArgNamespace = parser.parse_args()
 
     if ns.verbose:
         logger.setLevel(logging.DEBUG)
