@@ -35,6 +35,9 @@ __all__ = ["main", "get_argparser", "RackWSServer"]
 _log = logger.getChild(__name__)
 
 
+DEFAULT_CONFIG_PATH = Path(__file__).parent / "config_example.toml"
+
+
 def _serialize_control(ctrl: PortControl) -> dict:
     """Serialize a ControlPort to dict for JSON."""
     return {
@@ -289,7 +292,7 @@ def get_argparser():
 
     parser = argparse.ArgumentParser(description="MOD Rack WebSocket Server")
     parser.add_argument("--server", "-s", default=DEFAULT_SERVER_URL, help="MOD server URL")
-    parser.add_argument("--config", "-c", help="Config", type=Path, default="config.toml")
+    parser.add_argument("--config", "-c", help="Config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument(
         "--rack-ws-port",
         "-p",

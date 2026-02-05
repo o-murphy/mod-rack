@@ -5,6 +5,7 @@ Run with: python qrack.py
 """
 
 import logging
+import re
 import signal
 import sys
 
@@ -41,12 +42,521 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QDialogButtonBox,
-    QMenu,
+    QLineEdit,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QRect, QSize, QPoint, QMimeData
+from PySide6.QtGui import QPainter, QColor, QPolygon, QPen, QFont, QDrag, QPixmap
 
 
 _log = logger.getChild(__name__)
+
+
+# Color mapping for plugin categories
+CATEGORY_COLORS = {
+    "Reverb": "#5B9BD5",  # Blue
+    "Delay": "#70AD47",  # Green
+    "Distortion": "#C00000",  # Red
+    "Filter": "#FFC000",  # Orange/Yellow
+    "Modulator": "#7030A0",  # Purple
+    "Chorus": "#7030A0",  # Purple
+    "Phaser": "#9966CC",  # Light purple
+    "Flanger": "#8B008B",  # Dark magenta
+    "Dynamics": "#ED7D31",  # Orange
+    "Compressor": "#ED7D31",  # Orange
+    "Gate": "#C55A11",  # Dark orange
+    "MIDI": "#00B0F0",  # Cyan
+    "Utility": "#808080",  # Gray
+    "Generator": "#00B050",  # Bright green
+    "Instrument": "#00B050",  # Bright green
+    "Simulator": "#BF8F00",  # Gold/Brown
+    "ControlVoltage": "#FF6699",  # Pink
+    "Spectral": "#9933FF",  # Violet
+    "Pitch Shifter": "#9933FF",  # Violet
+    "Spatial": "#00CED1",  # Dark turquoise
+    "Equaliser": "#DAA520",  # Goldenrod
+    "Waveshaper": "#DC143C",  # Crimson
+    "Analyser": "#4682B4",  # Steel blue
+    "Mixer": "#696969",  # Dim gray
+}
+DEFAULT_COLOR = "#A0A0A0"  # Default gray
+
+
+def get_category_color(categories: list[str]) -> str:
+    """Get color for first matching category."""
+    for cat in categories:
+        if cat in CATEGORY_COLORS:
+            return CATEGORY_COLORS[cat]
+    return DEFAULT_COLOR
+
+
+def abbreviate_name(name: str) -> str:
+    """Create abbreviated name: capital letters or first 4 chars."""
+    # Extract capital letters (excluding first if it's the only capital)
+    capitals = "".join(c for c in name if c.isupper())
+    if len(capitals) >= 2:
+        return capitals[:4]
+    # Fall back to first 4 characters
+    return name[:4]
+
+
+class CableView(QWidget):
+    """Visual representation of the effect chain as colored boxes on a cable."""
+
+    slot_clicked = Signal(str)  # label
+    add_clicked = Signal()  # add button clicked
+    bypass_toggled = Signal(str, bool)  # label, new_bypassed_state
+    remove_clicked = Signal(str)  # label - remove slot
+    slot_dropped = Signal(str, int)  # source_label, destination_index
+
+    BOX_WIDTH = 44
+    BOX_HEIGHT = 88
+    BOX_SPACING_MIN = 8
+    BOX_SPACING_MAX = 40
+    CABLE_HEIGHT = 4
+    MARGIN = 16
+    TOGGLE_SIZE = 16
+    CLOSE_SIZE = 14
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._slots: list[dict] = []  # [{label, name, categories, selected}]
+        self._hovered_index: int | None = None
+        self._drag_start_pos = None
+        self._dragging_index: int | None = None
+        self._drop_indicator_index: int | None = None  # Where to show drop indicator
+        self.setMouseTracking(True)
+        self.setAcceptDrops(True)
+        self.setMinimumHeight(self.BOX_HEIGHT + self.MARGIN * 2)
+        self.setMaximumHeight(self.BOX_HEIGHT + self.MARGIN * 2)
+
+    def set_slots(self, slots: list[dict]):
+        """Update slots data. Each dict: {label, name, categories, selected}"""
+        self._slots = slots
+        self.setMinimumWidth(self._get_content_width())
+        self.updateGeometry()
+        self.update()
+
+    def set_selected(self, label: str | None):
+        """Mark a slot as selected."""
+        for slot in self._slots:
+            slot["selected"] = slot["label"] == label
+        self.update()
+
+    def set_bypassed(self, label: str, bypassed: bool):
+        """Update bypass state for a slot."""
+        for slot in self._slots:
+            if slot["label"] == label:
+                slot["bypassed"] = bypassed
+                self.update()
+                break
+
+    def _get_dynamic_spacing(self) -> int:
+        """Calculate spacing based on available width."""
+        num_slots = len(self._slots)
+        if num_slots == 0:
+            return self.BOX_SPACING_MIN
+
+        num_items = num_slots + 1  # slots + add button
+        min_content_width = num_items * self.BOX_WIDTH + num_slots * self.BOX_SPACING_MIN
+        available_width = self.width() - self.MARGIN * 2
+
+        if available_width <= min_content_width:
+            return self.BOX_SPACING_MIN
+
+        # Distribute extra space
+        extra_space = available_width - min_content_width
+        extra_per_gap = extra_space // num_slots if num_slots > 0 else 0
+        return min(self.BOX_SPACING_MIN + extra_per_gap, self.BOX_SPACING_MAX)
+
+    def _get_content_start_x(self) -> int:
+        """Get x position to start content (for centering)."""
+        num_slots = len(self._slots)
+        num_items = num_slots + 1  # slots + add button
+        spacing = self._get_dynamic_spacing()
+        total_width = num_items * self.BOX_WIDTH + num_slots * spacing
+        return max(self.MARGIN, (self.width() - total_width) // 2)
+
+    def _get_add_button_x(self) -> int:
+        """Get x position of the add button."""
+        start_x = self._get_content_start_x()
+        spacing = self._get_dynamic_spacing()
+        return start_x + len(self._slots) * (self.BOX_WIDTH + spacing)
+
+    def _get_content_width(self) -> int:
+        """Get minimum width of content (slots + add button + margins)."""
+        num_slots = len(self._slots)
+        num_items = num_slots + 1  # slots + add button
+        return num_items * self.BOX_WIDTH + num_slots * self.BOX_SPACING_MIN + self.MARGIN * 2
+
+    def sizeHint(self):
+        return QSize(self._get_content_width(), self.BOX_HEIGHT + self.MARGIN * 2)
+
+    def minimumSizeHint(self):
+        return QSize(self._get_content_width(), self.BOX_HEIGHT + self.MARGIN * 2)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        width = self.width()
+        height = self.height()
+        center_y = height // 2
+        spacing = self._get_dynamic_spacing()
+
+        # Draw cable (horizontal line)
+        cable_color = QColor("#333333")
+        painter.setPen(QPen(cable_color, self.CABLE_HEIGHT))
+        painter.drawLine(0, center_y, width, center_y)
+
+        # Center boxes horizontally
+        start_x = self._get_content_start_x()
+
+        font = QFont()
+        font.setPointSize(8)
+        font.setBold(True)
+        painter.setFont(font)
+
+        y = center_y - self.BOX_HEIGHT // 2
+
+        # Draw slot boxes
+        for i, slot in enumerate(self._slots):
+            x = start_x + i * (self.BOX_WIDTH + spacing)
+
+            # Box color from category
+            color = QColor(get_category_color(slot.get("categories", [])))
+
+            # Draw box
+            if slot.get("selected"):
+                painter.setPen(QPen(QColor("#FFFFFF"), 3))
+            else:
+                painter.setPen(QPen(color.darker(150), 1))
+
+            painter.setBrush(color)
+            painter.drawRoundedRect(x, y, self.BOX_WIDTH, self.BOX_HEIGHT, 6, 6)
+
+            # Draw abbreviated name (upper part)
+            painter.setPen(QColor("#FFFFFF"))
+            abbrev = abbreviate_name(slot.get("name", "?"))
+            text_rect = QRect(x, y + 4, self.BOX_WIDTH, 30)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, abbrev)
+
+            # Draw bypass toggle button (bottom) - clickable
+            toggle_x = x + (self.BOX_WIDTH - self.TOGGLE_SIZE) // 2
+            toggle_y = y + self.BOX_HEIGHT - self.TOGGLE_SIZE - 6
+
+            # Toggle button style - outline circle
+            painter.setPen(QPen(QColor("#FFFFFF"), 2))
+            painter.setBrush(QColor("#00000000"))  # Transparent
+            painter.drawEllipse(toggle_x, toggle_y, self.TOGGLE_SIZE, self.TOGGLE_SIZE)
+            # Inner fill based on state - red when active (not bypassed)
+            inner_margin = 4
+            if not slot.get("bypassed"):
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor("#FF0000"))
+                painter.drawEllipse(
+                    toggle_x + inner_margin,
+                    toggle_y + inner_margin,
+                    self.TOGGLE_SIZE - inner_margin * 2,
+                    self.TOGGLE_SIZE - inner_margin * 2,
+                )
+
+            # Draw close button (top right corner) - only on hover
+            if i == self._hovered_index:
+                close_x = x + self.BOX_WIDTH - self.CLOSE_SIZE - 2
+                close_y = y + 2
+                painter.setPen(QPen(QColor("#FFFFFF"), 1))
+                painter.setBrush(QColor("#C00000"))
+                painter.drawEllipse(close_x, close_y, self.CLOSE_SIZE, self.CLOSE_SIZE)
+                # Draw X
+                painter.setPen(QPen(QColor("#FFFFFF"), 2))
+                xmargin = 4
+                painter.drawLine(
+                    close_x + xmargin,
+                    close_y + xmargin,
+                    close_x + self.CLOSE_SIZE - xmargin,
+                    close_y + self.CLOSE_SIZE - xmargin,
+                )
+                painter.drawLine(
+                    close_x + self.CLOSE_SIZE - xmargin,
+                    close_y + xmargin,
+                    close_x + xmargin,
+                    close_y + self.CLOSE_SIZE - xmargin,
+                )
+
+        # Draw add button (+) - square, centered vertically
+        add_x = self._get_add_button_x()
+        add_size = self.BOX_WIDTH  # Square button
+        add_y = center_y - add_size // 2
+        add_color = QColor("#666666")  # Gray
+        painter.setPen(QPen(add_color.darker(120), 2))
+        painter.setBrush(add_color)
+        painter.drawRoundedRect(add_x, add_y, add_size, add_size, 6, 6)
+
+        # Draw + sign
+        painter.setPen(QPen(QColor("#FFFFFF"), 3))
+        plus_margin = 10
+        painter.drawLine(
+            add_x + plus_margin, add_y + add_size // 2, add_x + add_size - plus_margin, add_y + add_size // 2
+        )
+        painter.drawLine(
+            add_x + add_size // 2, add_y + plus_margin, add_x + add_size // 2, add_y + add_size - plus_margin
+        )
+
+        # Draw drop indicator
+        if self._drop_indicator_index is not None:
+            indicator_x = start_x + self._drop_indicator_index * (self.BOX_WIDTH + spacing) - spacing // 2
+            painter.setPen(QPen(QColor("#00AAFF"), 3))
+            painter.drawLine(indicator_x, y - 4, indicator_x, y + self.BOX_HEIGHT + 4)
+            # Draw triangles at top and bottom
+            painter.setBrush(QColor("#00AAFF"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            # Top triangle
+
+            top_tri = QPolygon(
+                [
+                    QPoint(indicator_x - 6, y - 8),
+                    QPoint(indicator_x + 6, y - 8),
+                    QPoint(indicator_x, y - 2),
+                ]
+            )
+            painter.drawPolygon(top_tri)
+            # Bottom triangle
+            bot_tri = QPolygon(
+                [
+                    QPoint(indicator_x - 6, y + self.BOX_HEIGHT + 8),
+                    QPoint(indicator_x + 6, y + self.BOX_HEIGHT + 8),
+                    QPoint(indicator_x, y + self.BOX_HEIGHT + 2),
+                ]
+            )
+            painter.drawPolygon(bot_tri)
+
+    def mousePressEvent(self, event):
+        """Handle click on a slot box, toggle, or add button."""
+        click_x = event.position().x()
+        click_y = event.position().y()
+        start_x = self._get_content_start_x()
+        spacing = self._get_dynamic_spacing()
+        center_y = self.height() // 2
+        y = center_y - self.BOX_HEIGHT // 2
+
+        # Reset drag state
+        self._drag_start_pos = None
+        self._dragging_index = None
+
+        # Check slot boxes
+        for i, slot in enumerate(self._slots):
+            x = start_x + i * (self.BOX_WIDTH + spacing)
+            if x <= click_x <= x + self.BOX_WIDTH:
+                # Check if click is on close button (top right)
+                close_x = x + self.BOX_WIDTH - self.CLOSE_SIZE - 2
+                close_y = y + 2
+                if close_x <= click_x <= close_x + self.CLOSE_SIZE and close_y <= click_y <= close_y + self.CLOSE_SIZE:
+                    self.remove_clicked.emit(slot["label"])
+                    return
+                # Check if click is on toggle button
+                toggle_x = x + (self.BOX_WIDTH - self.TOGGLE_SIZE) // 2
+                toggle_y = y + self.BOX_HEIGHT - self.TOGGLE_SIZE - 6
+                if (
+                    toggle_x <= click_x <= toggle_x + self.TOGGLE_SIZE
+                    and toggle_y <= click_y <= toggle_y + self.TOGGLE_SIZE
+                ):
+                    # Toggle bypass
+                    new_state = not slot.get("bypassed", False)
+                    self.bypass_toggled.emit(slot["label"], new_state)
+                else:
+                    # Select slot and prepare for potential drag
+                    self.slot_clicked.emit(slot["label"])
+                    self._drag_start_pos = event.position()
+                    self._dragging_index = i
+                return
+
+        # Check add button (square, centered)
+        add_x = self._get_add_button_x()
+        add_size = self.BOX_WIDTH
+        add_y = center_y - add_size // 2
+        if add_x <= click_x <= add_x + add_size and add_y <= click_y <= add_y + add_size:
+            self.add_clicked.emit()
+
+    def mouseMoveEvent(self, event):
+        """Track hover state and handle drag initiation."""
+        pos_x = event.position().x()
+        start_x = self._get_content_start_x()
+        spacing = self._get_dynamic_spacing()
+
+        # Handle drag initiation
+        if (
+            event.buttons() & Qt.MouseButton.LeftButton
+            and self._drag_start_pos is not None
+            and self._dragging_index is not None
+        ):
+            distance = (event.position() - self._drag_start_pos).manhattanLength()
+            if distance >= QApplication.startDragDistance():
+                self._start_drag()
+                return
+
+        # Track hover state for close button visibility
+        new_hovered = None
+        for i in range(len(self._slots)):
+            x = start_x + i * (self.BOX_WIDTH + spacing)
+            if x <= pos_x <= x + self.BOX_WIDTH:
+                new_hovered = i
+                break
+
+        if new_hovered != self._hovered_index:
+            self._hovered_index = new_hovered
+            self.update()
+
+    def _start_drag(self):
+        """Initiate drag operation for the current slot."""
+        if self._dragging_index is None or self._dragging_index >= len(self._slots):
+            return
+
+        slot = self._slots[self._dragging_index]
+        label = slot["label"]
+
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData("application/x-slot-label", label.encode("utf-8"))
+        mime.setText(label)
+        drag.setMimeData(mime)
+
+        # Create a pixmap of the slot being dragged
+        pix = QPixmap(self.BOX_WIDTH, self.BOX_HEIGHT)
+        pix.fill(QColor(get_category_color(slot.get("categories", []))))
+        drag.setPixmap(pix)
+
+        QApplication.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
+        drag.exec(Qt.DropAction.MoveAction)
+        QApplication.restoreOverrideCursor()
+
+        # Reset drag state
+        self._drag_start_pos = None
+        self._dragging_index = None
+
+    def leaveEvent(self, event):
+        """Clear hover state when mouse leaves widget."""
+        if self._hovered_index is not None:
+            self._hovered_index = None
+            self.update()
+
+    def dragEnterEvent(self, event):
+        """Accept drag if it contains slot label data."""
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-slot-label") or mime.hasText():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Accept drag move and update drop indicator."""
+        mime = event.mimeData()
+        if mime.hasFormat("application/x-slot-label") or mime.hasText():
+            event.acceptProposedAction()
+
+            # Auto-scroll when near edges
+            scroll_area = self.parent().parent() if self.parent() else None
+            if scroll_area and hasattr(scroll_area, "horizontalScrollBar"):
+                scrollbar = scroll_area.horizontalScrollBar()
+                viewport = scroll_area.viewport()
+                # Get position relative to viewport
+                local_pos = self.mapTo(viewport, event.position().toPoint())
+                edge_margin = 50
+                scroll_step = 20
+
+                if local_pos.x() < edge_margin:
+                    scrollbar.setValue(scrollbar.value() - scroll_step)
+                elif local_pos.x() > viewport.width() - edge_margin:
+                    scrollbar.setValue(scrollbar.value() + scroll_step)
+
+            # Update drop indicator position
+            drop_x = event.position().x()
+            start_x = self._get_content_start_x()
+            spacing = self._get_dynamic_spacing()
+
+            new_indicator = len(self._slots)  # Default to end
+            for i in range(len(self._slots)):
+                x = start_x + i * (self.BOX_WIDTH + spacing)
+                slot_center = x + self.BOX_WIDTH // 2
+                if drop_x < slot_center:
+                    new_indicator = i
+                    break
+
+            if new_indicator != self._drop_indicator_index:
+                self._drop_indicator_index = new_indicator
+                self.update()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        """Clear drop indicator when drag leaves."""
+        if self._drop_indicator_index is not None:
+            self._drop_indicator_index = None
+            self.update()
+
+    def dropEvent(self, event):
+        """Handle drop - reorder slots."""
+        mime = event.mimeData()
+        if not (mime.hasFormat("application/x-slot-label") or mime.hasText()):
+            event.ignore()
+            return
+
+        # Clear drop indicator
+        self._drop_indicator_index = None
+
+        # Get source label
+        if mime.hasFormat("application/x-slot-label"):
+            src_label = bytes(mime.data("application/x-slot-label")).decode("utf-8")
+        else:
+            src_label = mime.text()
+
+        # Find source index
+        src_index = None
+        for i, slot in enumerate(self._slots):
+            if slot["label"] == src_label:
+                src_index = i
+                break
+
+        if src_index is None:
+            event.ignore()
+            self.update()
+            return
+
+        # Find destination index based on drop position
+        drop_x = event.position().x()
+        start_x = self._get_content_start_x()
+        spacing = self._get_dynamic_spacing()
+
+        dest_index = len(self._slots)  # Default to end
+        for i in range(len(self._slots)):
+            x = start_x + i * (self.BOX_WIDTH + spacing)
+            slot_center = x + self.BOX_WIDTH // 2
+            if drop_x < slot_center:
+                dest_index = i
+                break
+
+        # Adjust for removal when moving right
+        if src_index < dest_index:
+            dest_index -= 1
+
+        if src_index == dest_index:
+            event.ignore()
+            self.update()
+            return
+
+        self.slot_dropped.emit(src_label, dest_index)
+        event.acceptProposedAction()
+
+    def wheelEvent(self, event):
+        """Redirect vertical wheel to horizontal scroll."""
+        # Parent is viewport, its parent is QScrollArea
+        scroll_area = self.parent().parent() if self.parent() else None
+        if scroll_area and hasattr(scroll_area, "horizontalScrollBar"):
+            scrollbar = scroll_area.horizontalScrollBar()
+            delta = event.angleDelta().y()
+            scrollbar.setValue(scrollbar.value() - delta)
+            event.accept()
+        else:
+            super().wheelEvent(event)
 
 
 class ControlWidget(QWidget):
@@ -219,12 +729,11 @@ class IntegerControl(ControlWidget):
         layout.addWidget(self.label)
 
         # Slider with integer steps
-        self.slider = QDial()
-
-        self.slider.setRange(int(control.minimum), int(control.maximum))
-        self.slider.setValue(int(control.value))
-        self.slider.valueChanged.connect(self._on_slider_changed)
-        layout.addWidget(self.slider)
+        self.dial = QDial()
+        self.dial.setRange(int(control.minimum), int(control.maximum))
+        self.dial.setValue(int(control.value))
+        self.dial.valueChanged.connect(self._on_slider_changed)
+        layout.addWidget(self.dial)
 
         # Value display
         self.value_label = QLabel(control.format_value())
@@ -236,9 +745,9 @@ class IntegerControl(ControlWidget):
         self._emit_change(float(value))
 
     def _set_widget_value(self, value: float):
-        self.slider.blockSignals(True)
-        self.slider.setValue(int(value))
-        self.slider.blockSignals(False)
+        self.dial.blockSignals(True)
+        self.dial.setValue(int(value))
+        self.dial.blockSignals(False)
         self.value_label.setText(self.control.format_value(value))
 
 
@@ -294,17 +803,32 @@ class PluginSelectorDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
+        # Filter input
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("Filter by name, label, or category (supports regex)")
+        self.filter_input.textChanged.connect(self._on_filter_changed)
+        layout.addWidget(self.filter_input)
+
         # Plugin list - show only whitelisted plugins
         self.list_widget = QListWidget()
 
+        # Store plugin data for filtering
+        self._plugins = []
         for p_config in rack.config.plugins:
             name = p_config.name
             uri = p_config.uri
-            category = p_config.category or "General"
+            category = p_config.category or ["General"]
+            label = getattr(p_config, "label", "") or ""
+            self._plugins.append(
+                {
+                    "name": name,
+                    "uri": uri,
+                    "category": category,
+                    "label": label,
+                }
+            )
 
-            item = QListWidgetItem(f"{name}\n  [{', '.join(category)}]")
-            item.setData(Qt.ItemDataRole.UserRole, uri)
-            self.list_widget.addItem(item)
+        self._populate_list(self._plugins)
 
         self.list_widget.itemDoubleClicked.connect(self._on_double_click)
         layout.addWidget(self.list_widget)
@@ -314,6 +838,50 @@ class PluginSelectorDialog(QDialog):
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _populate_list(self, plugins: list[dict]):
+        """Populate the list widget with given plugins."""
+        self.list_widget.clear()
+        for p in plugins:
+            item = QListWidgetItem(f"{p['name']}\n  [{', '.join(p['category'])}]")
+            item.setData(Qt.ItemDataRole.UserRole, p["uri"])
+            self.list_widget.addItem(item)
+
+    def _on_filter_changed(self, text: str):
+        """Filter plugins by name, label, or category using regex or partial match."""
+        if not text:
+            self._populate_list(self._plugins)
+            return
+
+        # Try to compile as regex, fall back to case-insensitive substring match
+        try:
+            pattern = re.compile(text, re.IGNORECASE)
+            use_regex = True
+        except re.error:
+            use_regex = False
+            text_lower = text.lower()
+
+        filtered = []
+        for p in self._plugins:
+            searchable = [
+                p["name"] or "",
+                p["label"] or "",
+                *p["category"],
+            ]
+            match = False
+            for field in searchable:
+                if use_regex:
+                    if pattern.search(field):
+                        match = True
+                        break
+                else:
+                    if text_lower in field.lower():
+                        match = True
+                        break
+            if match:
+                filtered.append(p)
+
+        self._populate_list(filtered)
 
     def _on_double_click(self, item):
         self.selected_uri = item.data(Qt.UserRole)
@@ -326,134 +894,10 @@ class PluginSelectorDialog(QDialog):
         self.accept()
 
 
-class SlotWidget(QFrame):
-    """Widget representing a single slot in the rack."""
-
-    clicked = Signal(str)  # label
-    remove_requested = Signal(str)  # label
-    replace_requested = Signal(str)  # label
-    dropped = Signal(str, int)  # source_label, destination_index
-
-    def __init__(self, label: str, index: int, plugin_name: str, parent=None):
-        super().__init__(parent)
-        self.slot_label_id = label  # Plugin label (unique ID)
-        self.index = index
-        self.is_selected = False
-
-        self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
-        self.setLineWidth(2)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumSize(120, 80)
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._show_context_menu)
-        self.setAcceptDrops(True)
-        self._drag_start_pos = None
-
-        layout = QVBoxLayout(self)
-
-        # Slot number
-        self.slot_num_label = QLabel(f"Slot {index}")
-        self.slot_num_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.slot_num_label)
-
-        # Plugin name
-        self.plugin_label = QLabel(plugin_name)
-        self.plugin_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.plugin_label.setWordWrap(True)
-        layout.addWidget(self.plugin_label)
-
-        self._update_style()
-
-    def set_selected(self, selected: bool):
-        self.is_selected = selected
-        self._update_style()
-
-    def _update_style(self):
-        if self.is_selected:
-            self.setStyleSheet("SlotWidget { background-color: #3daee9; }")
-        else:
-            self.setStyleSheet("")
-
-    def _show_context_menu(self, pos):
-        """Show context menu for slot operations."""
-        menu = QMenu()
-
-        replace_action = menu.addAction("Replace Plugin")
-        replace_action.triggered.connect(lambda: self.replace_requested.emit(self.slot_label_id))
-
-        remove_action = menu.addAction("Remove Plugin")
-        remove_action.triggered.connect(lambda: self.remove_requested.emit(self.slot_label_id))
-
-        menu.exec(self.mapToGlobal(pos))
-
-    def mousePressEvent(self, event):
-        # emit click and store drag start position
-        _log.debug("MOUSE_PRESS: label=%s pos=%s", self.slot_label_id, event.position())
-        self.clicked.emit(self.slot_label_id)
-        self._drag_start_pos = event.position()
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton and self._drag_start_pos is not None:
-            distance = (event.position() - self._drag_start_pos).manhattanLength()
-            _log.debug("MOUSE_MOVE: label=%S distance=%s", self.slot_label_id, distance)
-            if distance >= QApplication.startDragDistance():
-                from PySide6.QtGui import QDrag, QPixmap
-                from PySide6.QtCore import QMimeData
-
-                drag = QDrag(self)
-                mime = QMimeData()
-                # put both custom data and plain text for robustness
-                mime.setData("application/x-slot-label", self.slot_label_id.encode("utf-8"))
-                mime.setText(self.slot_label_id)
-                drag.setMimeData(mime)
-
-                # optional pixmap
-                pix = QPixmap(self.size())
-                self.render(pix)
-                drag.setPixmap(pix)
-
-                _log.debug("START_DRAG: label=%s", self.slot_label_id)
-                # change cursor to closed hand while dragging
-                QApplication.setOverrideCursor(Qt.ClosedHandCursor)
-                result = drag.exec(Qt.MoveAction)
-                QApplication.restoreOverrideCursor()
-                _log.debug("DRAG_RESULT: label=%s result=%s", self.slot_label_id, result)
-
-        super().mouseMoveEvent(event)
-
-    def dragEnterEvent(self, event):
-        mime = event.mimeData()
-        if mime.hasFormat("application/x-slot-label") or mime.hasText():
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragMoveEvent(self, event):
-        mime = event.mimeData()
-        if mime.hasFormat("application/x-slot-label") or mime.hasText():
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dropEvent(self, event):
-        mime = event.mimeData()
-        if mime.hasFormat("application/x-slot-label") or mime.hasText():
-            if mime.hasText():
-                src_label = mime.text()
-            else:
-                src_label = bytes(mime.data("application/x-slot-label")).decode("utf-8")
-            # debug log
-            _log.debug("DROP_EVENT: src_label=%s dest_index=%s", src_label, self.index)
-            # emit source label and this widget's index as destination
-            self.dropped.emit(src_label, self.index)
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-
 class ControlsPanel(QScrollArea):
     """Panel showing controls for selected plugin."""
+
+    bypass_changed = Signal(str, bool)  # label, bypassed
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -518,7 +962,7 @@ class ControlsPanel(QScrollArea):
         outputs_grid = QGridLayout(outputs_group)
 
         out_row = out_col = 0
-        max_cols = 3
+        max_cols = 10
 
         # ================================
         # INPUTS (bottom)
@@ -598,6 +1042,8 @@ class ControlsPanel(QScrollArea):
         """Handle bypass checkbox change."""
         if self.plugin:
             self.plugin.bypass(state)
+            if self.current_label:
+                self.bypass_changed.emit(self.current_label, state)
 
 
 class MainWindow(QMainWindow):
@@ -627,38 +1073,36 @@ class MainWindow(QMainWindow):
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
-        main_layout = QHBoxLayout(central)
+        main_layout = QVBoxLayout(central)
 
-        # Left side - slots
-        self.left_panel = QVBoxLayout()
+        # Cable visualization at top (with horizontal scroll)
+        self.cable_scroll = QScrollArea()
+        self.cable_scroll.setWidgetResizable(True)
+        self.cable_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.cable_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.cable_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scrollbar_height = self.cable_scroll.horizontalScrollBar().sizeHint().height()
+        self.cable_scroll.setMinimumHeight(CableView.BOX_HEIGHT + CableView.MARGIN * 2)
+        self.cable_scroll.setMaximumHeight(CableView.BOX_HEIGHT + CableView.MARGIN * 2 + scrollbar_height)
 
-        slots_label = QLabel("<b>Effect Chain</b>")
-        self.left_panel.addWidget(slots_label)
+        self.cable_view = CableView()
+        self.cable_view.slot_clicked.connect(self._on_slot_clicked)
+        self.cable_view.add_clicked.connect(self._on_add_plugin)
+        self.cable_view.bypass_toggled.connect(self._on_cable_bypass_toggled)
+        self.cable_view.remove_clicked.connect(self._on_remove_plugin)
+        self.cable_view.slot_dropped.connect(self._on_slot_dropped)
+        self.cable_scroll.setWidget(self.cable_view)
+        main_layout.addWidget(self.cable_scroll)
 
-        # Container for slot widgets
-        self.slots_container = QVBoxLayout()
-        self.left_panel.addLayout(self.slots_container)
-
-        self.slot_widgets: list[SlotWidget] = []
-
-        # Add plugin button (no empty slots anymore)
-        self.add_plugin_btn = QPushButton("+ Add Plugin")
-        self.add_plugin_btn.clicked.connect(self._on_add_plugin)
-        self.left_panel.addWidget(self.add_plugin_btn)
-
-        self.left_panel.addStretch()
-
-        # Clear all button
-        clear_all_btn = QPushButton("Clear All")
-        clear_all_btn.clicked.connect(self._on_clear_all)
-        self.left_panel.addWidget(clear_all_btn)
-
-        main_layout.addLayout(self.left_panel)
-
-        # Rackht side - controls panel
+        # Controls panel below
         self.controls_panel = ControlsPanel()
-        self.controls_panel.setMinimumWidth(500)
+        self.controls_panel.bypass_changed.connect(self._on_local_bypass_changed)
         main_layout.addWidget(self.controls_panel, stretch=1)
+
+        # Clear all button at bottom
+        self.clear_all_btn = QPushButton("Clear All")
+        self.clear_all_btn.clicked.connect(self._on_clear_all)
+        main_layout.addWidget(self.clear_all_btn)
 
         self.rack.client.ws.connect()
 
@@ -668,28 +1112,22 @@ class MainWindow(QMainWindow):
         self.order_changed_signal.emit(slots)
 
     def _rebuild_slot_widgets(self):
-        """Rebuild all slot widgets from rack state."""
-        # Clear existing widgets
-        for widget in self.slot_widgets:
-            widget.deleteLater()
-        self.slot_widgets.clear()
+        """Rebuild cable view from rack state."""
+        # Build cable view data
+        cable_slots = []
+        for slot in self.rack.slots:
+            cable_slots.append(
+                {
+                    "label": slot.label,
+                    "name": slot.plugin.name,
+                    "categories": slot.plugin._effect.category,
+                    "selected": False,
+                    "bypassed": slot.plugin._bypassed,
+                }
+            )
 
-        # Clear layout
-        while self.slots_container.count():
-            item = self.slots_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        # Create new widgets for each slot
-        for i, slot in enumerate(self.rack.slots):
-            plugin_name = slot.plugin.name
-            slot_widget = SlotWidget(slot.label, i, plugin_name)
-            slot_widget.clicked.connect(self._on_slot_clicked)
-            slot_widget.remove_requested.connect(self._on_remove_plugin)
-            slot_widget.replace_requested.connect(self._on_replace_plugin)
-            slot_widget.dropped.connect(self._on_slot_dropped)
-            self.slot_widgets.append(slot_widget)
-            self.slots_container.addWidget(slot_widget)
+        # Update cable view
+        self.cable_view.set_slots(cable_slots)
 
         # Update selection
         if self.selected_label and self.rack.get_slot_by_label(self.selected_label):
@@ -699,13 +1137,12 @@ class MainWindow(QMainWindow):
         else:
             self.selected_label = None
             self.controls_panel.set_plugin(None)
+            self.cable_view.set_selected(None)
 
     def _select_slot(self, label: str):
         """Select a slot and show its controls."""
         self.selected_label = label
-
-        for sw in self.slot_widgets:
-            sw.set_selected(sw.slot_label_id == label)
+        self.cable_view.set_selected(label)
 
         slot = self.rack.get_slot_by_label(label)
         if slot:
@@ -755,8 +1192,9 @@ class MainWindow(QMainWindow):
     def _on_clear_all(self):
         """Clear all plugins."""
         self.rack.clear()
-        # Immediately update UI to reflect cleared state
-        self._rebuild_slot_widgets()
+        # update UI to reflect cleared state
+        # self._rebuild_slot_widgets()
+        QTimer.singleShot(100, self._rebuild_slot_widgets)
 
     def _on_slot_dropped(self, src_label: str, dest_index: int):
         """Handle drag-and-drop reorder: move src slot to dest index."""
@@ -794,9 +1232,26 @@ class MainWindow(QMainWindow):
             widget.set_value_silent(value)
 
     def _on_ws_bypass_changed(self, label: str, bypassed: bool):
-        """Handle bypass change in main thread."""
+        """Handle bypass change from WebSocket."""
+        # Update cable view bypass indicator
+        self.cable_view.set_bypassed(label, bypassed)
+
         if label == self.selected_label:
             self.controls_panel.set_bypass_silent(bypassed)
+
+    def _on_local_bypass_changed(self, label: str, bypassed: bool):
+        """Handle bypass change from local UI (checkbox)."""
+        self.cable_view.set_bypassed(label, bypassed)
+
+    def _on_cable_bypass_toggled(self, label: str, bypassed: bool):
+        """Handle bypass toggle from cable view."""
+        slot = self.rack.get_slot_by_label(label)
+        if slot:
+            slot.plugin.bypass(bypassed)
+            self.cable_view.set_bypassed(label, bypassed)
+            # Update controls panel checkbox if this is the selected slot
+            if label == self.selected_label:
+                self.controls_panel.set_bypass_silent(bypassed)
 
     def _on_rack_order_changed(self, order: list):
         """Handle order change from WebSocket - rebuild UI."""
@@ -810,9 +1265,6 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer
-
     parser = get_argparser()
     ns = parser.parse_args()
 

@@ -125,7 +125,7 @@ class PluginSlot:
         """Generate base label from plugin URI."""
         path = uri.split("#")[0].rstrip("/")
         label = path.split("/")[-1]
-        return label.replace("#", "_").replace(" ", "_")
+        return label.replace("#", "_").replace(" ", "_").replace("-", "_")
 
     def is_pos_changed(self, new_pos: tuple[float, float]):
         new_x, new_y = new_pos
@@ -239,8 +239,8 @@ class GridLayoutManager:
 
     X_STEP: float = 500.0
     Y_STEP: float = 200.0
-    X_MIN_SPACING: float = 100.0
-    Y_MIN_SPACING: float = 50.0
+    X_MIN_SPACING: float = 70.0
+    Y_MIN_SPACING: float = 30.0
     BASE_X: float = 150.0
     BASE_Y: float = 100.0
     Y_THRESHOLD: float = 200.0
@@ -1142,7 +1142,7 @@ class Orchestrator:
             if not self.slots:
                 return
 
-            _cp.red("\u232B Clearing Rack")
+            _cp.red("\u232b Clearing Rack")
 
             # 1. Stop order monitoring during mass removal
             # (optional, but useful to have a mass operation flag)

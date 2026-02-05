@@ -9,6 +9,7 @@ Provides typed dataclasses for plugin control ports with support for:
 - Integer controls (discrete steps)
 """
 
+from collections.abc import Iterable
 import math
 from dataclasses import dataclass, field
 
@@ -220,9 +221,7 @@ class PortControl:
         return formatted
 
 
-def parse_control_ports(
-    plugin_label: str, effect: Effect, *, filter_gui_controls: bool = True
-) -> list[PortControl]:
+def parse_control_ports(plugin_label: str, effect: Effect, *, filter_gui_controls: bool = True) -> list[PortControl]:
     """
     Parse all control input ports from effect_get response.
 
@@ -233,13 +232,17 @@ def parse_control_ports(
         List of ControlPort objects for all control inputs
     """
     control_ports = effect.ports.control
-    inputs = control_ports.input
-    outputs = control_ports.output
+    inputs: Iterable[Port] = control_ports.input
+    outputs: Iterable[Port] = control_ports.output
 
-    def _filter_gui_controls(controls_list: list[Port]):
-        return [
-            control for control in controls_list if "notOnGUI" not in control.properties
-        ]
+    def _filter_gui_controls(controls_list: Iterable[Port]) -> Iterable[Port]:
+        def _on_gui(control: Port):
+            return "notOnGUI" not in control.properties
+
+        return (filter(_on_gui, controls_list))
+        # NOTE: The sollution bellow is not working properly
+        # gui_ports = [port.symbol for port in effect.gui.ports]
+        # return [control for control in controls_list if control.symbol in gui_ports]
 
     if filter_gui_controls:
         inputs = _filter_gui_controls(inputs)

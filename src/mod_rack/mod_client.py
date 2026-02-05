@@ -402,7 +402,7 @@ class WsProtocol:
             case ["transport", *_any]:
                 TransportEvent(_any)
 
-            case ["true_bypass", _a, _b, *_]:
+            case ["truebypass", _a, _b, *_]:
                 try:
                     return TrueBypassEvent(int(_a), int(_b))
                 except ValueError:
