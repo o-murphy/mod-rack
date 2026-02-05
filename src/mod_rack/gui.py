@@ -18,7 +18,7 @@ from mod_rack.mod_client import (
 from mod_rack.plugin import Plugin
 from mod_rack.service import ArgNamespace, RackWSServer, get_argparser
 from mod_rack.schema.config import Config
-from mod_rack.rack import Rack
+from mod_rack.rack import PluginSlot, Rack
 from mod_rack.controls import PortControl
 from mod_rack.mod_client import PortDirection
 from mod_rack.rack import OrchestratorMode
@@ -247,8 +247,28 @@ class CableView(QWidget):
             else:
                 painter.setPen(QPen(color.darker(150), 1))
 
-            painter.setBrush(color)
-            painter.drawRoundedRect(x, y, self.BOX_WIDTH, self.BOX_HEIGHT, 6, 6)
+            img: bytes | None = slot.get("img")
+            if img:
+                pixmap = QPixmap()
+                pixmap.loadFromData(img)
+
+                # Малюємо зображення, вписуючи його в розміри BOX
+                # KeepAspectRatio допоможе не розтягувати картинку потворно
+                scaled_pixmap = pixmap.scaled(
+                    self.BOX_WIDTH,
+                    self.BOX_HEIGHT,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+
+                # Центруємо картинку всередині прямокутника бокса
+                img_x = x + (self.BOX_WIDTH - scaled_pixmap.width()) // 2
+                img_y = y + (self.BOX_HEIGHT - scaled_pixmap.height()) // 2
+
+                painter.drawPixmap(img_x, img_y, scaled_pixmap)
+            else:
+                painter.setBrush(color)
+                painter.drawRoundedRect(x, y, self.BOX_WIDTH, self.BOX_HEIGHT, 6, 6)
 
             # Draw abbreviated name (upper part)
             painter.setPen(QColor("#FFFFFF"))
@@ -748,7 +768,7 @@ class IntegerControl(ControlWidget):
         palette.setColor(QPalette.ColorRole.Window, QColor("#2c3e50"))  # Фон навколо
 
         self.dial.setPalette(palette)
-        
+
         self.dial.setRange(int(control.minimum), int(control.maximum))
         self.dial.setValue(int(control.value))
         self.dial.valueChanged.connect(self._on_slider_changed)
@@ -1130,6 +1150,8 @@ class MainWindow(QMainWindow):
         # Build cable view data
         cable_slots = []
         for slot in self.rack.slots:
+            # NOTE: maybe for the future
+            # img: bytes | None = slot.plugin.get_thumbnail()
             cable_slots.append(
                 {
                     "label": slot.label,
@@ -1137,6 +1159,7 @@ class MainWindow(QMainWindow):
                     "categories": slot.plugin._effect.category,
                     "selected": False,
                     "bypassed": slot.plugin._bypassed,
+                    # "img": img
                 }
             )
 

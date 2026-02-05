@@ -66,6 +66,8 @@ class Plugin:
         self._load_controls(filter_gui_controls)
         self._subscribe()
 
+        self._thumbnail: bytes | None = None
+
     @property
     def name(self) -> str:
         return self._effect.name
@@ -113,6 +115,14 @@ class Plugin:
     @property
     def control_outputs(self) -> list[Port]:
         return self._filter_and_sort_ports(self._effect.ports.control.output)
+
+    @property
+    def thumbnail(self) -> bytes | None:
+        try:
+            if self._thumbnail is None:
+                self._thumbnail = self.client.effect_image(self.uri, "thumbnail.png")
+        finally:
+            return self._thumbnail
 
     def _graph_path(self, port: Port | None) -> str:
         if port is None:
