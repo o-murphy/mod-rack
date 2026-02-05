@@ -372,36 +372,36 @@ class GridLayoutManager:
     @classmethod
     def get_insertion_coords(cls, slots: list[PluginSlot], index: int | None = None) -> tuple[float, float]:
         """
-        Calculate coordinates based on visual rows (clusters).
+        Calculates coordinates by either:
+        1. Placing the new plugin slightly to the left of the target slot (for middle insertion).
+        2. Placing it to the right of the last slot (for end insertion).
         """
-        rows = cls.get_clustered_rows(slots)
+        ordered_slots = cls.sort_slots(list(slots))
+        total = len(ordered_slots)
 
-        # 1. If no slots or insertion at the very end
-        if not rows or index is None or index >= sum(len(r) for r in rows):
-            row_idx = len(rows) - 1 if rows else 0
-            # Take the last row
-            target_row = rows[-1] if rows else []
 
-            # If last row is not empty, place TO THE RIGHT of the last
-            if target_row:
-                x = cls.BASE_X + len(target_row) * cls.X_STEP
-                y = cls.BASE_Y + (len(rows) - 1) * cls.Y_STEP
-            else:
-                x, y = cls.BASE_X, cls.BASE_Y
+        if total == 0 or index == 0:
+            return (float(cls.BASE_X), float(cls.BASE_Y))
 
-            return (float(x), float(y))
+        if index is None or index >= total:
+            last_slot = ordered_slots[-1]
 
-        # 2. If insertion inside (find specific row and column)
-        current_idx = 0
-        for row_idx, row_slots in enumerate(rows):
-            if current_idx <= index < current_idx + len(row_slots):
-                col_idx = index - current_idx
-                x = cls.BASE_X + col_idx * cls.X_STEP
-                y = cls.BASE_Y + row_idx * cls.Y_STEP
-                return (float(x), float(y))
-            current_idx += len(row_slots)
+            last_width = last_slot.size[0] if (last_slot.size and last_slot.size[0] > 0) else cls.X_STEP
 
-        return (float(cls.BASE_X), float(cls.BASE_Y))
+            new_x = last_slot.pos_x + last_width + cls.X_MIN_SPACING
+            new_y = last_slot.pos_y
+
+            return (float(new_x), float(new_y))
+
+        target_slot = ordered_slots[index]
+
+        new_x = max(cls.BASE_X, target_slot.pos_x - 10.0)
+        new_y = target_slot.pos_y
+
+        if new_x == target_slot.pos_x:
+            new_y -= 1.0
+
+        return (float(new_x), float(new_y))
 
     @classmethod
     def get_new_row_coords(cls, slots: list[PluginSlot]) -> tuple[float, float]:

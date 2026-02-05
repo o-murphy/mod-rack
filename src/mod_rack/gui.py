@@ -44,9 +44,21 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QDialogButtonBox,
     QLineEdit,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QRect, QSize, QPoint, QMimeData
-from PySide6.QtGui import QPainter, QColor, QPolygon, QPen, QFont, QDrag, QPixmap, QIcon
+from PySide6.QtGui import (
+    QPalette,
+    QPainter,
+    QColor,
+    QPolygon,
+    QPen,
+    QFont,
+    QDrag,
+    QPixmap,
+    QIcon,
+    QFontMetrics,
+)
 
 
 _log = logger.getChild(__name__)
@@ -577,6 +589,14 @@ class ControlWidget(QWidget):
         self._local_change_timer = QTimer(self)
         self._local_change_timer.setSingleShot(True)
 
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        # Label
+        self.label = QLabel(control.shortName)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
     def set_value_silent(self, value: float):
         """Set value from server without emitting signal.
         Ignored while user is actively interacting (cooldown)."""
@@ -602,28 +622,31 @@ class KnobControl(ControlWidget):
     def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Label
-        self.label = QLabel(control.name)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label)
-
         # Dial
         self.dial = QDial()
+        # self.dial.setStyleSheet("""
+        # QDial {
+        #     background-color: #AAAAAA;
+        # }
+        # """)
+        palette = self.dial.palette()
+        palette.setColor(QPalette.ColorRole.Button, QColor("#3498db"))  # Колір кола
+        palette.setColor(QPalette.ColorRole.Window, QColor("#2c3e50"))  # Фон навколо
+
+        self.dial.setPalette(palette)
+
         self.dial.setNotchesVisible(True)
         self.dial.setNotchTarget(100.0)
         self.dial.setWrapping(False)
         self.dial.setRange(0, self.SLIDER_STEPS)
         self.dial.setValue(self._value_to_slider(control.value))
         self.dial.valueChanged.connect(self._on_slider_changed)
-        layout.addWidget(self.dial)
+        self.layout().addWidget(self.dial)
 
         # Value display
         self.value_label = QLabel(control.format_value())
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.value_label)
+        self.layout().addWidget(self.value_label)
 
     def _value_to_slider(self, value: float) -> int:
         """Convert actual value to slider position using normalize."""
@@ -656,7 +679,7 @@ class ToggleControl(ControlWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        self.checkbox = QCheckBox(control.name)
+        self.checkbox = QCheckBox(control.shortName)
         self.checkbox.setChecked(control.value >= 0.5)
         self.checkbox.stateChanged.connect(self._on_state_changed)
         layout.addWidget(self.checkbox)
@@ -678,13 +701,6 @@ class EnumControl(ControlWidget):
     def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Label
-        self.label = QLabel(control.name)
-        layout.addWidget(self.label)
-
         # ComboBox
         self.combo = QComboBox()
         for sp in control.scale_points:
@@ -696,7 +712,7 @@ class EnumControl(ControlWidget):
             self.combo.setCurrentIndex(current_idx)
 
         self.combo.currentIndexChanged.connect(self._on_index_changed)
-        layout.addWidget(self.combo)
+        self.layout().addWidget(self.combo)
 
     def _value_to_index(self, value: float) -> int:
         for i, sp in enumerate(self.control.scale_points):
@@ -724,25 +740,24 @@ class IntegerControl(ControlWidget):
     def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Label
-        self.label = QLabel(control.name)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label)
-
         # Slider with integer steps
         self.dial = QDial()
+
+        palette = self.dial.palette()
+        palette.setColor(QPalette.ColorRole.Button, QColor("#9834db"))  # Колір кола
+        palette.setColor(QPalette.ColorRole.Window, QColor("#2c3e50"))  # Фон навколо
+
+        self.dial.setPalette(palette)
+        
         self.dial.setRange(int(control.minimum), int(control.maximum))
         self.dial.setValue(int(control.value))
         self.dial.valueChanged.connect(self._on_slider_changed)
-        layout.addWidget(self.dial)
+        self.layout().addWidget(self.dial)
 
         # Value display
         self.value_label = QLabel(control.format_value())
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.value_label)
+        self.layout().addWidget(self.value_label)
 
     def _on_slider_changed(self, value: int):
         self.value_label.setText(self.control.format_value(value))
@@ -761,20 +776,12 @@ class MeterControl(ControlWidget):
     def __init__(self, control: PortControl, parent=None):
         super().__init__(control, parent)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Name label
-        self.label = QLabel(control.name)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label)
-
         # Value display (normalized 0.0-1.0)
         normalized = control.normalize(control.value)
         self.value_label = QLabel(f"{normalized:.2f}")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.value_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        layout.addWidget(self.value_label)
+        self.layout().addWidget(self.value_label)
 
     def _set_widget_value(self, value: float):
         normalized = self.control.normalize(value)
@@ -973,6 +980,7 @@ class ControlsPanel(QScrollArea):
         # ================================
         inputs_group = QGroupBox("Controls")
         inputs_grid = QGridLayout(inputs_group)
+        inputs_grid.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         in_row = in_col = 0
 
@@ -980,6 +988,7 @@ class ControlsPanel(QScrollArea):
 
         for control in controls:
             widget = create_control_widget(control)
+            widget.setFixedSize(80, 120)
             widget.value_changed.connect(self._on_control_changed)
             self.control_widgets[control.symbol] = widget
 
@@ -1163,6 +1172,7 @@ class MainWindow(QMainWindow):
         """Add a new plugin (request via REST, wait for WS feedback)."""
         dialog = PluginSelectorDialog(self.rack, self)
         if dialog.exec() == QDialog.Accepted and dialog.selected_uri:
+            print(len(self.rack.slots))
             label = self.rack.request_add_plugin_at(dialog.selected_uri, len(self.rack.slots))
             if label:
                 _log.debug("Requested add plugin, label=%s", label)

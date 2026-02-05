@@ -57,6 +57,10 @@ class PortControl:
     @property
     def name(self) -> str:
         return self.port.name
+    
+    @property
+    def shortName(self) -> str:
+        return self.port.shortName
 
     @property
     def symbol(self) -> str:
